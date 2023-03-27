@@ -1,0 +1,22 @@
+name: Style
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}-${{ github.event.ref }}
+  cancel-in-progress: true
+
+on: [push, pull_request]
+
+jobs:
+  check-style:
+    name: Ruff codespell black
+    runs-on: "ubuntu-latest"
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+    - name: Install ruff and codespell
+      run: pip install ruff codespell tomli
+    - run: make ruff
+    - run: make codespell-error
+    - uses: psf/black@stable
