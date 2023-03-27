@@ -9,9 +9,6 @@ jobs:
   check-style:
     name: Ruff codespell black
     runs-on: "ubuntu-latest"
-    defaults:
-      run:
-        shell: bash -l {0}
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
