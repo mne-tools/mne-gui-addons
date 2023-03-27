@@ -1,0 +1,70 @@
+[project]
+name = "mne-gui-addons"
+description = "MNE-Python GUI addons."
+readme = "README.rst"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+keywords = ["science", "neuroscience", "psychology"]
+authors = [
+  {name = "Alex Rockhill", email = "aprockhill206@gmail.com"},
+  {name = "Eric Larson"},
+]
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python"
+]
+dependencies = [
+    "packaging",
+    "qtpy",
+    "pyvista",
+    "pyvistaqt",
+    "mne",
+    "setuptools >=65",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+    "pytest-cov",
+    "pytest-qt",
+    "black",  # function signature formatting
+]
+
+[project.urls]
+homepage = "https://github.com/mne-tools/mne-gui-addons"
+repository = "https://github.com/mne-tools/mne-gui-addons"
+changelog = "https://github.com/mne-tools/mne-gui-addons/releases"
+
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+tag_regex = "^(?P<prefix>v)?(?P<version>[0-9.]+)(?P<suffix>.*)?$"
+version_scheme = "release-branch-semver"
+
+[tool.setuptools.packages.find]
+exclude = ["false"]  # on CircleCI this folder appears during pip install -ve. for an unknown reason
+
+[tool.codespell]
+skip = "docs/site/*,*.html,steps/freesurfer/contrib/*"
+ignore-words = "ignore_words.txt"
+builtin = "clear,rare,informal,names,usage"
+quiet-level = 3
+interactive = 3
+enable-colors = ""
+count = ""
+
+[tool.pytest.ini_options]
+addopts = "-ra -vv --tb=short --cov=mne_gui_addons --cov-report= --junit-xml=junit-results.xml --durations=10"
+testpaths = [
+    "mne_gui_addons",
+]
+junit_family = "xunit2"
+
+[tool.ruff]
+exclude = ["dist/" , "build/"]
+
+[tool.black]
+exclude = "(dist/)|(build/)"
