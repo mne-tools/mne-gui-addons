@@ -17,6 +17,6 @@ jobs:
     - uses: actions/setup-python@v4
     - name: Install ruff and codespell
       run: pip install ruff codespell tomli
-    - run: make ruff
-    - run: make codespell-error
+    - run: ruff mne_gui_addons/
+    - run: codespell -i0 mne_gui_addons/
     - uses: psf/black@stable
