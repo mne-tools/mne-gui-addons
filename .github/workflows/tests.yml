@@ -17,18 +17,29 @@ jobs:
   test:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
-    # TODO: Add Qt versions
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11"]  # Oldest and newest supported versions
         mne-version: [mne-main]
+        qt: [PyQt6]
         include:
-          # Old
+          # Old (and PyQt5)
           - os: ubuntu-latest
             python-version: "3.8"
             mne-version: mne-stable
+            qt: PyQt5
+          # PySide2
+          - os: ubuntu-latest
+            python-version: "3.10"
+            mne-version: mne-main
+            qt: PySide2
+          # PySide6
+          - os: ubuntu-latest
+            python-version: "3.10"
+            mne-version: mne-main
+            qt: PySide6
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -44,8 +55,11 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: mne sys_info
+    - run: pip install -v ${{ matrix.qt }}
     - run: pip install -ve .[tests]
+    - run: mne sys_info
+    - run: mne sys_info -pd | grep "qtpy .*({{ matrix.qt }}=.*)$"
+      name: Check Qt
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
     - run: ./tools/get_testing_version.sh
       working-directory: mne-python
