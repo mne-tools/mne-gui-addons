@@ -61,7 +61,7 @@ jobs:
     - run: pip install -v ${{ matrix.qt }}
     - run: pip install -ve .[tests]
     - run: mne sys_info
-    - run: mne sys_info -pd | grep "qtpy .*({{ matrix.qt }}=.*)$"
+    - run: mne sys_info -pd | grep "qtpy .*(${{ matrix.qt }}=.*)$"
       name: Check Qt
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
     - run: ./tools/get_testing_version.sh
