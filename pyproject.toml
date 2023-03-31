@@ -19,6 +19,7 @@ dependencies = [
     "pyvista",
     "pyvistaqt",
     "mne",
+    "nibabel",
     "traitlets",
     "setuptools >=65",
 ]
