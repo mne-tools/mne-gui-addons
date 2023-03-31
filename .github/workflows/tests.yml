@@ -28,7 +28,7 @@ jobs:
           # Old (and PyQt5)
           - os: ubuntu-latest
             python-version: "3.8"
-            mne-version: mne-stable
+            mne-version: mne-main  # TODO: Set back to mne-stable once 1.4 is out (we need its pytest fixtures)
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
