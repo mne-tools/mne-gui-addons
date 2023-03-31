@@ -20,6 +20,7 @@ dependencies = [
     "pyvistaqt",
     "mne",
     "nibabel",
+    "dipy>=1.4",
     "traitlets",
     "setuptools >=65",
 ]
