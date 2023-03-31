@@ -7,9 +7,9 @@
 from importlib.metadata import version, PackageNotFoundError
 
 import numpy as np
-from mne.utils import verbose, _check_option
-from ._utils import _fill_doc
+from mne.utils import verbose as _verbose, _check_option
 
+from ._utils import _fill_doc
 
 try:
     __version__ = version("mne_gui_addons")
@@ -18,7 +18,7 @@ except PackageNotFoundError:
     __version__ = "0.0.0"  # pragma: no cover
 
 
-@verbose
+@_verbose
 @_fill_doc
 def locate_ieeg(
     info,
@@ -62,7 +62,7 @@ def locate_ieeg(
     gui : instance of IntracranialElectrodeLocator
         The graphical user interface (GUI) window.
     """
-    from ..viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+    from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
     from ._ieeg_locate import IntracranialElectrodeLocator
 
     app = _init_mne_qtapp()
@@ -82,7 +82,7 @@ def locate_ieeg(
     return gui
 
 
-@verbose
+@_verbose
 @_fill_doc
 def view_vol_stc(
     stcs,
@@ -156,7 +156,7 @@ def view_vol_stc(
     gui : instance of VolSourceEstimateViewer
         The graphical user interface (GUI) window.
     """
-    from ..viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+    from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
     from ._vol_stc import (
         VolSourceEstimateViewer,
         BASE_INT_DTYPE,

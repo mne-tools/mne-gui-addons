@@ -20,6 +20,9 @@ baseline covariance matrices.
 # %%
 
 import numpy as np
+
+import mne_gui_addons
+
 import mne
 from mne.cov import compute_covariance
 from mne.datasets import somato
@@ -271,7 +274,7 @@ stcs = mne.minimum_norm.apply_inverse_tfr_epochs(
 # Plot volume source estimates
 # ----------------------------
 
-viewer = mne.gui.view_vol_stc(
+viewer = mne_gui_addons.view_vol_stc(
     stcs, subject=subject, subjects_dir=subjects_dir, src=vol_src, inst=epochs_tfr
 )
 viewer.go_to_extreme()  # show the maximum intensity source vertex
