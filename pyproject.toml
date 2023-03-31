@@ -19,6 +19,7 @@ dependencies = [
     "pyvista",
     "pyvistaqt",
     "mne",
+    "traitlets",
     "setuptools >=65",
 ]
 dynamic = ["version"]
