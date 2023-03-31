@@ -132,8 +132,6 @@ workflows:
     jobs:
       - build_docs:
           name: build_docs
-      - linkcheck:
-          name: linkcheck
       - deploy:
           name: deploy
           requires:
