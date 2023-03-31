@@ -95,6 +95,9 @@ jobs:
         - restore_cache:
             keys:
               - website-cache
+        - add-ssh-keys:
+            fingerprints:
+              - "18:ca:dc:af:9a:80:ee:23:91:fd:84:ae:93:7a:7b:4f"
         - run:
             name: Deploy docs
             command: |
@@ -102,7 +105,7 @@ jobs:
               mkdir -p ~/.ssh
               echo -e "Host *\nStrictHostKeyChecking no" > ~/.ssh/config
               chmod og= ~/.ssh/config
-              git config --global user.email "circle@mne.com"
+              git config --global user.email "circle@mne.tools"
               git config --global user.name "Circle CI"
               if [ ! -d ~/mne-tools.github.io ]; then
                 git clone git@github.com:/mne-tools/mne-tools.github.io.git ~/mne-tools.github.io
