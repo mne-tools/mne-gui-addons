@@ -116,9 +116,8 @@ jobs:
               git reset --hard origin/main
               git clean -xdf
               echo "Deploying dev docs for ${CIRCLE_BRANCH}."
-              mkdir -p mne-gui-addons
-              rm -Rf mne-gui-addons/dev
-              cp -a /tmp/build/html mne-gui-addons/dev
+              rm -Rf mne-gui-addons
+              cp -a /tmp/build/html mne-gui-addons
               git add -A
               git commit -m "CircleCI update of mne-gui-addons docs (${CIRCLE_BUILD_NUM})."
               git push origin main
@@ -131,6 +130,9 @@ workflows:
   default:
     jobs:
       - build_docs:
+          filters:
+            tags:
+              only: /^v.*/
           name: build_docs
       - deploy:
           name: deploy
@@ -140,3 +142,5 @@ workflows:
             branches:
               only:
                 - main
+            tags:
+              only: /^v.*/
