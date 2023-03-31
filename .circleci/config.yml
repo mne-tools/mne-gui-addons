@@ -1,0 +1,141 @@
+version: 2.1
+jobs:
+    build_docs:
+      parameters:
+        scheduled:
+          type: string
+          default: "false"
+      docker:
+        - image: cimg/base:current-22.04
+      steps:
+        - checkout
+        - run:
+            name: Check-skip
+            command: |
+              set -e
+              export COMMIT_MESSAGE=$(git log --format=oneline -n 1);
+              if [[ -v CIRCLE_PULL_REQUEST ]] && ([[ "$COMMIT_MESSAGE" == *"[skip circle]"* ]] || [[ "$COMMIT_MESSAGE" == *"[circle skip]"* ]]); then
+                echo "Skip detected, exiting job ${CIRCLE_JOB} for PR ${CIRCLE_PULL_REQUEST}."
+                circleci-agent step halt;
+              fi
+        - run:
+            name: Set BASH_ENV
+            command: |
+              set -e
+              set -o pipefail
+              git clone --single-branch --branch main git@github.com:/mne-tools/mne-python.git
+              ./mne-python/tools/setup_xvfb.sh
+              sudo apt install -qq graphviz optipng python3.10-venv python3-venv libxft2 ffmpeg
+              python3.10 -m venv ~/python_env
+              echo "set -e" >> $BASH_ENV
+              echo "export OPENBLAS_NUM_THREADS=4" >> $BASH_ENV
+              echo "export XDG_RUNTIME_DIR=/tmp/runtime-circleci" >> $BASH_ENV
+              echo "export PATH=~/.local/bin/:$PATH" >> $BASH_ENV
+              echo "export DISPLAY=:99" >> $BASH_ENV
+              echo "source ~/python_env/bin/activate" >> $BASH_ENV
+              mkdir -p ~/.local/bin
+              ln -s ~/python_env/bin/python ~/.local/bin/python
+              echo "BASH_ENV:"
+              cat $BASH_ENV
+              mkdir -p ~/mne_data
+        - run:
+            name: Get Python running
+            command: |
+              pip install --upgrade PyQt6 sphinx-gallery pydata-sphinx-theme numpydoc
+              pip install -ve ./mne-python .
+        - run:
+            name: Check Qt
+            command: |
+              ./mne-python/tools/check_qt_import.sh PyQt6
+        - run:
+            name: Check installation
+            command: |
+               which python
+               QT_DEBUG_PLUGINS=1 mne sys_info -pd
+               python -c "import numpy; numpy.show_config()"
+               LIBGL_DEBUG=verbose python -c "import pyvistaqt; pyvistaqt.BackgroundPlotter(show=True)"
+        - run:
+            name: List packages
+            command: python -m pip list
+        - restore_cache:
+            keys:
+              - data-cache-somato
+        - run:
+            name: Get data
+            command: |
+              python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True)"
+              ls -al ~/mne_data;
+        - run:
+            name: make html
+            command: |
+              make -C doc html
+        - store_test_results:
+            path: doc/_build/test-results
+        - store_artifacts:
+            path: doc/_build/test-results
+            destination: test-results
+        - store_artifacts:
+            path: doc/_build/html/
+            destination: dev
+        - persist_to_workspace:
+            root: doc/_build
+            paths:
+              - html
+        - save_cache:
+            key: data-cache-somato
+            paths:
+              - ~/mne_data/MNE-somato-data
+
+    deploy:
+      machine:
+        image: ubuntu-2004:202111-01
+      steps:
+        - attach_workspace:
+            at: /tmp/build
+        - restore_cache:
+            keys:
+              - website-cache
+        - run:
+            name: Deploy docs
+            command: |
+              set -eo pipefail
+              mkdir -p ~/.ssh
+              echo -e "Host *\nStrictHostKeyChecking no" > ~/.ssh/config
+              chmod og= ~/.ssh/config
+              git config --global user.email "circle@mne.com"
+              git config --global user.name "Circle CI"
+              if [ ! -d ~/mne-tools.github.io ]; then
+                git clone git@github.com:/mne-tools/mne-tools.github.io.git ~/mne-tools.github.io
+              fi
+              cd ~/mne-tools.github.io
+              git checkout main
+              git fetch origin
+              git reset --hard origin/main
+              git clean -xdf
+              echo "Deploying dev docs for ${CIRCLE_BRANCH}."
+              mkdir -p mne-gui-addons
+              rm -Rf mne-gui-addons/dev
+              cp -a /tmp/build/html mne-gui-addons/dev
+              git add -A
+              git commit -m "CircleCI update of mne-gui-addons docs (${CIRCLE_BUILD_NUM})."
+              git push origin main
+        - save_cache:
+            key: website-cache
+            paths:
+              - ~/mne-tools.githbub.io
+
+workflows:
+  default:
+    jobs:
+      - build_docs:
+          name: build_docs
+      - linkcheck:
+          name: linkcheck
+      - deploy:
+          name: deploy
+          requires:
+            - build_docs
+          filters:
+            branches:
+              only:
+                - main

@@ -27,7 +27,6 @@ dynamic = ["version"]
 tests = [
     "pytest",
     "pytest-cov",
-    "pytest-qt",
     "black",  # function signature formatting
 ]
 
