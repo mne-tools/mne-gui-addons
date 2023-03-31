@@ -7,7 +7,9 @@
 from importlib.metadata import version, PackageNotFoundError
 
 import numpy as np
-from mne.utils import verbose, get_config, warn, _check_option
+from mne.utils import verbose, _check_option
+from ._utils import _fill_doc
+
 
 try:
     __version__ = version("mne_gui_addons")
@@ -17,6 +19,7 @@ except PackageNotFoundError:
 
 
 @verbose
+@_fill_doc
 def locate_ieeg(info, trans, base_image, subject=None, subjects_dir=None,
                 groups=None, show=True, block=False, verbose=None):
     """Locate intracranial electrode contacts.
@@ -64,6 +67,7 @@ def locate_ieeg(info, trans, base_image, subject=None, subjects_dir=None,
 
 
 @verbose
+@_fill_doc
 def view_vol_stc(stcs, freq_first=True, group=False,
                  subject=None, subjects_dir=None, src=None, inst=None,
                  use_int=True, show_topomap=True, tmin=None, tmax=None,
