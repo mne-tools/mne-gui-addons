@@ -12,7 +12,9 @@ from mne.utils.docs import _indentcount_lines, docdict as _mne_docdict
 docdict = _mne_docdict.copy()
 # Specific to this repo
 
-docdict['tmax'] = """
+docdict[
+    "tmax"
+] = """
 tmax : scalar
     Time point of the last sample in data.
 """
@@ -46,7 +48,7 @@ def _fill_doc(f):
     try:
         indented = docdict_indented[icount]
     except KeyError:
-        indent = ' ' * icount
+        indent = " " * icount
         docdict_indented[icount] = indented = {}
         for name, dstr in docdict.items():
             lines = dstr.splitlines()
@@ -54,14 +56,15 @@ def _fill_doc(f):
                 newlines = [lines[0]]
                 for line in lines[1:]:
                     newlines.append(indent + line)
-                indented[name] = '\n'.join(newlines)
+                indented[name] = "\n".join(newlines)
             except IndexError:
                 indented[name] = dstr
     try:
         f.__doc__ = docstring % indented
     except (TypeError, ValueError, KeyError) as exp:
         funcname = f.__name__
-        funcname = docstring.split('\n')[0] if funcname is None else funcname
-        raise RuntimeError('%s documenting %s:\n%s'
-                           % (exp.__class__.__name__, funcname, str(exp)))
+        funcname = docstring.split("\n")[0] if funcname is None else funcname
+        raise RuntimeError(
+            "%s documenting %s:\n%s" % (exp.__class__.__name__, funcname, str(exp))
+        )
     return f

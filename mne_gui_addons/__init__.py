@@ -20,8 +20,17 @@ except PackageNotFoundError:
 
 @verbose
 @_fill_doc
-def locate_ieeg(info, trans, base_image, subject=None, subjects_dir=None,
-                groups=None, show=True, block=False, verbose=None):
+def locate_ieeg(
+    info,
+    trans,
+    base_image,
+    subject=None,
+    subjects_dir=None,
+    groups=None,
+    show=True,
+    block=False,
+    verbose=None,
+):
     """Locate intracranial electrode contacts.
 
     Parameters
@@ -59,8 +68,15 @@ def locate_ieeg(info, trans, base_image, subject=None, subjects_dir=None,
     app = _init_mne_qtapp()
 
     gui = IntracranialElectrodeLocator(
-        info, trans, base_image, subject=subject, subjects_dir=subjects_dir,
-        groups=groups, show=show, verbose=verbose)
+        info,
+        trans,
+        base_image,
+        subject=subject,
+        subjects_dir=subjects_dir,
+        groups=groups,
+        show=show,
+        verbose=verbose,
+    )
     if block:
         _qt_app_exec(app)
     return gui
@@ -68,10 +84,22 @@ def locate_ieeg(info, trans, base_image, subject=None, subjects_dir=None,
 
 @verbose
 @_fill_doc
-def view_vol_stc(stcs, freq_first=True, group=False,
-                 subject=None, subjects_dir=None, src=None, inst=None,
-                 use_int=True, show_topomap=True, tmin=None, tmax=None,
-                 show=True, block=False, verbose=None):
+def view_vol_stc(
+    stcs,
+    freq_first=True,
+    group=False,
+    subject=None,
+    subjects_dir=None,
+    src=None,
+    inst=None,
+    use_int=True,
+    show_topomap=True,
+    tmin=None,
+    tmax=None,
+    show=True,
+    block=False,
+    verbose=None,
+):
     """View a volume time and/or frequency source time course estimate.
 
     Parameters
@@ -129,31 +157,34 @@ def view_vol_stc(stcs, freq_first=True, group=False,
         The graphical user interface (GUI) window.
     """
     from ..viz.backends._utils import _init_mne_qtapp, _qt_app_exec
-    from ._vol_stc import (VolSourceEstimateViewer, BASE_INT_DTYPE,
-                           COMPLEX_DTYPE, RANGE_VALUE)
+    from ._vol_stc import (
+        VolSourceEstimateViewer,
+        BASE_INT_DTYPE,
+        COMPLEX_DTYPE,
+        RANGE_VALUE,
+    )
 
-    _check_option('group', group, (True, False, 'itc', 'power'))
+    _check_option("group", group, (True, False, "itc", "power"))
 
     app = _init_mne_qtapp()
 
     def itc(data):
         data = np.array(data)
-        return (np.abs((data / np.abs(data)).mean(axis=0)) * (RANGE_VALUE - 1)
-                ).astype(BASE_INT_DTYPE)
+        return (np.abs((data / np.abs(data)).mean(axis=0)) * (RANGE_VALUE - 1)).astype(
+            BASE_INT_DTYPE
+        )
 
     # cast to integers to lower memory usage, use custom complex data
     # type if necessary
     data = list()
-    for group_stcs in (stcs if group else [stcs]):
+    for group_stcs in stcs if group else [stcs]:
         # can be generator, compute using first stc object, just a general
         # rescaling of data, does not need to be precise
         scalar = None  # rescale per subject for better comparison
         outer_data = list()
-        for inner_stcs in (group_stcs if np.iterable(group_stcs) else
-                           [group_stcs]):
+        for inner_stcs in group_stcs if np.iterable(group_stcs) else [group_stcs]:
             inner_data = list()
-            for stc in (inner_stcs if np.iterable(inner_stcs) else
-                        [inner_stcs]):
+            for stc in inner_stcs if np.iterable(inner_stcs) else [inner_stcs]:
                 stc.crop(tmin=tmin, tmax=tmax)
                 if use_int:
                     if np.iscomplexobj(stc.data) and not group:
@@ -161,44 +192,52 @@ def view_vol_stc(stcs, freq_first=True, group=False,
                             # this is an order of magnitude approximation,
                             # if another stc is 10x larger than the first one,
                             # it will have some clipping
-                            scalar = \
-                                (RANGE_VALUE - 1) / stc.data.real.max() / 10
+                            scalar = (RANGE_VALUE - 1) / stc.data.real.max() / 10
                         stc_data = np.zeros(stc.data.shape, COMPLEX_DTYPE)
-                        stc_data['re'] = np.clip(stc.data.real * scalar,
-                                                 -RANGE_VALUE, RANGE_VALUE - 1)
-                        stc_data['im'] = np.clip(stc.data.imag * scalar,
-                                                 -RANGE_VALUE, RANGE_VALUE - 1)
+                        stc_data["re"] = np.clip(
+                            stc.data.real * scalar, -RANGE_VALUE, RANGE_VALUE - 1
+                        )
+                        stc_data["im"] = np.clip(
+                            stc.data.imag * scalar, -RANGE_VALUE, RANGE_VALUE - 1
+                        )
                         inner_data.append(stc_data)
                     else:
-                        if group in (True, 'power') and \
-                                np.iscomplexobj(stc.data):
+                        if group in (True, "power") and np.iscomplexobj(stc.data):
                             stc_data = (stc.data * stc.data.conj()).real
                         else:
                             stc_data = stc.data.copy()
                         if scalar is None:
                             scalar = (RANGE_VALUE - 1) / stc_data.max() / 5
                         # ignore group == 'itc' if not complex
-                        use_itc = group == 'itc' and np.iscomplexobj(stc.data)
-                        inner_data.append(stc_data if use_itc else
-                                          np.clip(stc_data * scalar,
-                                                  -RANGE_VALUE, RANGE_VALUE - 1
-                                                  ).astype(BASE_INT_DTYPE))
+                        use_itc = group == "itc" and np.iscomplexobj(stc.data)
+                        inner_data.append(
+                            stc_data
+                            if use_itc
+                            else np.clip(
+                                stc_data * scalar, -RANGE_VALUE, RANGE_VALUE - 1
+                            ).astype(BASE_INT_DTYPE)
+                        )
                 else:
                     inner_data.append(stc.data)
             # compute ITC here, need epochs
-            if group == 'itc' and np.iscomplexobj(stc.data) and freq_first:
+            if group == "itc" and np.iscomplexobj(stc.data) and freq_first:
                 outer_data.append(itc(inner_data))
             else:
                 outer_data.append(
                     np.mean(inner_data, axis=0).round().astype(BASE_INT_DTYPE)
-                    if group and freq_first else inner_data)
+                    if group and freq_first
+                    else inner_data
+                )
 
         # compute ITC here, need epochs
-        if group == 'itc' and np.iscomplexobj(stc.data) and not freq_first:
+        if group == "itc" and np.iscomplexobj(stc.data) and not freq_first:
             data.append(itc(outer_data))
         else:
-            data.append(np.mean(outer_data, axis=0).round().astype(
-                BASE_INT_DTYPE) if group and not freq_first else outer_data)
+            data.append(
+                np.mean(outer_data, axis=0).round().astype(BASE_INT_DTYPE)
+                if group and not freq_first
+                else outer_data
+            )
 
     data = np.array(data)
 
@@ -209,17 +248,25 @@ def view_vol_stc(stcs, freq_first=True, group=False,
         data = data[..., None]
 
     # move frequencies to penultimate
-    data = data.transpose((1, 2, 3, 0, 4) if freq_first and not group else
-                          (0, 2, 3, 1, 4))
+    data = data.transpose(
+        (1, 2, 3, 0, 4) if freq_first and not group else (0, 2, 3, 1, 4)
+    )
 
     # crop inst(s) to tmin and tmax
-    for this_inst in (inst if isinstance(inst, (list, tuple)) else [inst]):
+    for this_inst in inst if isinstance(inst, (list, tuple)) else [inst]:
         this_inst.crop(tmin=tmin, tmax=tmax)
 
     gui = VolSourceEstimateViewer(
-        data, subject=subject, subjects_dir=subjects_dir,
-        src=src, inst=inst, show_topomap=show_topomap, group=group,
-        show=show, verbose=verbose)
+        data,
+        subject=subject,
+        subjects_dir=subjects_dir,
+        src=src,
+        inst=inst,
+        show_topomap=show_topomap,
+        group=group,
+        show=show,
+        verbose=verbose,
+    )
     if block:
         _qt_app_exec(app)
     return gui
@@ -229,26 +276,28 @@ class _GUIScraper(object):
     """Scrape GUI outputs."""
 
     def __repr__(self):
-        return '<GUIScraper>'
+        return "<GUIScraper>"
 
     def __call__(self, block, block_vars, gallery_conf):
         from ._ieeg_locate import IntracranialElectrodeLocator
         from ._vol_stc import VolSourceEstimateViewer
         from sphinx_gallery.scrapers import figure_rst
         from qtpy import QtGui
-        for gui in block_vars['example_globals'].values():
-            if (isinstance(gui, (IntracranialElectrodeLocator,
-                                 VolSourceEstimateViewer)) and
-                    not getattr(gui, '_scraped', False) and
-                    gallery_conf['builder_name'] == 'html'):
+
+        for gui in block_vars["example_globals"].values():
+            if (
+                isinstance(gui, (IntracranialElectrodeLocator, VolSourceEstimateViewer))
+                and not getattr(gui, "_scraped", False)
+                and gallery_conf["builder_name"] == "html"
+            ):
                 gui._scraped = True  # monkey-patch but it's easy enough
-                img_fname = next(block_vars['image_path_iterator'])
+                img_fname = next(block_vars["image_path_iterator"])
                 # TODO fix in window refactor
-                window = gui if hasattr(gui, 'grab') else gui._renderer._window
+                window = gui if hasattr(gui, "grab") else gui._renderer._window
                 # window is QWindow
                 # https://doc.qt.io/qt-5/qwidget.html#grab
                 pixmap = window.grab()
-                if hasattr(gui, '_renderer'):  # if no renderer, no need
+                if hasattr(gui, "_renderer"):  # if no renderer, no need
                     # Now the tricky part: we need to get the 3D renderer,
                     # extract the image from it, and put it in the correct
                     # place in the pixmap. The easiest way to do this is
@@ -260,8 +309,8 @@ class _GUIScraper(object):
                     # https://doc.qt.io/qt-5/qwidget.html#mapTo
                     # https://doc.qt.io/qt-5/qpainter.html#drawPixmap-1
                     QtGui.QPainter(pixmap).drawPixmap(
-                        plotter.mapTo(window, plotter.rect().topLeft()),
-                        sub_pixmap)
+                        plotter.mapTo(window, plotter.rect().topLeft()), sub_pixmap
+                    )
                 # https://doc.qt.io/qt-5/qpixmap.html#save
                 pixmap.save(img_fname)
                 try:  # for compatibility with both GUIs, will be refactored
@@ -269,6 +318,5 @@ class _GUIScraper(object):
                 except Exception:
                     pass
                 gui.close()
-                return figure_rst(
-                    [img_fname], gallery_conf['src_dir'], 'GUI')
-        return ''
+                return figure_rst([img_fname], gallery_conf["src_dir"], "GUI")
+        return ""
