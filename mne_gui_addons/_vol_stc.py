@@ -44,7 +44,7 @@ from mne.viz.utils import _get_cmap
 
 BASE_INT_DTYPE = np.int16
 COMPLEX_DTYPE = np.dtype([("re", BASE_INT_DTYPE), ("im", BASE_INT_DTYPE)])
-RANGE_VALUE = 2**15
+RANGE_VALUE = 2 ** 15
 # for taking the complex conjugate, we need to be able to
 # temporarily store in a value where x**2 * 2 fits
 OVERFLOW_DYPE = np.int32
@@ -120,7 +120,7 @@ def _int_complex_conj(data):
 
 def _complex_to_vector(data):
     if data.dtype == COMPLEX_DTYPE:
-        data = (data['re'] + 1j * data['im'])
+        data = data["re"] + 1j * data["im"]
     assert np.iscomplexobj(data)
     data = np.abs(data) * np.cos(np.angle(data))
     return data
@@ -343,8 +343,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 self._stc_vectors = _complex_to_vector(data)
                 self._tfr_vector_max = self._stc_vectors.max()
                 self._stc_vectors = self._pick_stc_tfr(self._stc_vectors)
-            self._stc_vectors = self._pick_epoch(
-                self._stc_vectors).astype(float)
+            self._stc_vectors = self._pick_epoch(self._stc_vectors).astype(float)
             if self._f_idx is not None:
                 self._stc_vectors /= self._tfr_vector_max
             self._stc_vectors /= self._data_max
