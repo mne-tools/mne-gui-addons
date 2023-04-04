@@ -18,6 +18,7 @@ dependencies = [
     "qtpy",
     "pyvista",
     "pyvistaqt",
+    "matplotlib",
     "mne",
     "nibabel",
     "dipy>=1.4",
