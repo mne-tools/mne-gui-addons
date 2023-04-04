@@ -249,7 +249,7 @@ vol_fwd = mne.make_forward_solution(
 
 # Compute source estimate using MNE solver
 snr = 3.0
-lambda2 = 1.0 / snr ** 2
+lambda2 = 1.0 / snr**2
 method = "MNE"  # use MNE method (could also be dSPM or sLORETA)
 
 # make a different inverse operator for each frequency so as to properly

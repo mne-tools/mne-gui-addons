@@ -44,7 +44,7 @@ from mne.viz.utils import _get_cmap
 
 BASE_INT_DTYPE = np.int16
 COMPLEX_DTYPE = np.dtype([("re", BASE_INT_DTYPE), ("im", BASE_INT_DTYPE)])
-RANGE_VALUE = 2 ** 15
+RANGE_VALUE = 2**15
 # for taking the complex conjugate, we need to be able to
 # temporarily store in a value where x**2 * 2 fits
 OVERFLOW_DYPE = np.int32
