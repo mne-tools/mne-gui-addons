@@ -63,7 +63,12 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: pip install -v ${{ matrix.qt }}
+    - run: |
+        QT_LIB=${{ matrix.qt }}
+        if [[ "${{ matrix.qt }}" == "PySide6" ]]; then
+          QT_LIB="PySide6!=6.5"
+        fi
+        pip install -v "$QT_LIB"
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - run: |
