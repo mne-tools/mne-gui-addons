@@ -69,6 +69,7 @@ jobs:
           QT_LIB="PySide6!=6.5"
         fi
         pip install -v "$QT_LIB"
+      shell: bash -e {0}
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - run: |
