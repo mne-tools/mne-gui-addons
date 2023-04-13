@@ -35,7 +35,7 @@ def _get_neighbors(loc, image, voxels, val, tol):
     return neighbors
 
 
-def _voxel_neighbors(seed, image, tol):
+def _voxel_neighbors(seed, image, tol, max_n_voxels=200):
     """Find voxels contiguous with a seed location within a tolerance
 
     Parameters
@@ -67,6 +67,8 @@ def _voxel_neighbors(seed, image, tol):
             # add new voxels that match the criteria to the overall set
             voxels = voxels.union(voxel_neighbors)
         neighbors = next_neighbors  # start again checking all new neighbors
+        if len(voxels) > max_n_voxels:
+            break
     return voxels
 
 
@@ -95,7 +97,8 @@ class VolumeSegmenter(SliceBrowser):
         self._vol_actor = None
 
         super(VolumeSegmenter, self).__init__(
-            base_image=base_image, subject=subject, subjects_dir=subjects_dir
+            base_image=base_image, subject=subject, subjects_dir=subjects_dir,
+            check_aligned=False
         )
 
         self._vol_img = np.zeros(self._base_data.shape) * np.nan
@@ -146,6 +149,7 @@ class VolumeSegmenter(SliceBrowser):
         ch_vbox = QVBoxLayout()
         ch_vbox.addWidget(make_label("alpha"))
         ch_vbox.addWidget(make_label("tolerance"))
+        ch_vbox.addWidget(make_label("smooth"))
         slider_hbox.addLayout(ch_vbox)
 
         slider_vbox = QVBoxLayout()
@@ -154,6 +158,8 @@ class VolumeSegmenter(SliceBrowser):
         # no callback needed, will only be used when marked
         self._tol_slider = make_slider(0, 100, 10, None)
         slider_vbox.addWidget(self._tol_slider)
+        self._smooth_slider = make_slider(0, 100, 0, lambda x: self._plot_3d(render=True))
+        slider_vbox.addWidget(self._smooth_slider)
 
         slider_hbox.addLayout(slider_vbox)
 
@@ -315,7 +321,8 @@ class VolumeSegmenter(SliceBrowser):
         if self._vol_actor is not None:
             self._renderer.plotter.remove_actor(self._vol_actor, render=False)
         if self._vol_coords:
-            verts, tris = _marching_cubes(self._vol_img, [1])[0]
+            smooth = self._smooth_slider.value() / 100
+            verts, tris = _marching_cubes(self._vol_img, [1], smooth=smooth)[0]
             verts = apply_trans(self._vox_scan_ras_t, verts)  # vox -> scanner RAS
             verts = apply_trans(
                 self._mri_scan_ras_vox_t, verts
