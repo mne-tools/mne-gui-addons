@@ -18,7 +18,7 @@ from qtpy.QtWidgets import (
     QWidget,
     QLabel,
     QSlider,
-    QPushButton
+    QPushButton,
 )
 
 
@@ -59,8 +59,7 @@ def _voxel_neighbors(seed, image, tol):
     while neighbors:
         next_neighbors = set()
         for next_loc in neighbors:
-            voxel_neighbors = _get_neighbors(next_loc, image, voxels,
-                                             val, tol)
+            voxel_neighbors = _get_neighbors(next_loc, image, voxels, val, tol)
             # prevent looping back to already visited voxels
             voxel_neighbors = voxel_neighbors.difference(voxels)
             # add voxels not already visited to search next
@@ -292,8 +291,9 @@ class VolumeSegmenter(SliceBrowser):
     def _mark(self):
         """Mark the volume with the current tolerance and location."""
         self._undo_button.setEnabled(True)
-        voxels = _voxel_neighbors(self._vox, self._base_data,
-                                  self._tol_slider.value() / 100)
+        voxels = _voxel_neighbors(
+            self._vox, self._base_data, self._tol_slider.value() / 100
+        )
         if self._vol_coords:
             voxels = voxels.union(self._vol_coords[-1])
         self._vol_coords.append(voxels)
@@ -317,8 +317,12 @@ class VolumeSegmenter(SliceBrowser):
         if self._vol_coords:
             verts, tris = _marching_cubes(self._vol_img, [1])[0]
             verts = apply_trans(self._vox_scan_ras_t, verts)  # vox -> scanner RAS
-            verts = apply_trans(self._mri_scan_ras_vox_t, verts)  # scanner RAS -> mri vox
-            verts = apply_trans(self._mri_vox_ras_t, verts)  # mri vox -> mri surface RAS
+            verts = apply_trans(
+                self._mri_scan_ras_vox_t, verts
+            )  # scanner RAS -> mri vox
+            verts = apply_trans(
+                self._mri_vox_ras_t, verts
+            )  # mri vox -> mri surface RAS
             self._vol_actor = self._renderer.mesh(
                 *verts.T,
                 tris,
