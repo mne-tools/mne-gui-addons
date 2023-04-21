@@ -165,8 +165,9 @@ class VolumeSegmenter(SliceBrowser):
         slider_hbox.addLayout(slider_vbox)
 
         img_vbox = QVBoxLayout()
-        img_vbox.addWidget(make_label("Image min"))
-        img_vbox.addWidget(make_label("Image max"))
+        img_vbox.addWidget(make_label("Image Min"))
+        img_vbox.addWidget(make_label("Image Max"))
+        img_vbox.addWidget(make_label("Brain Alpha"))
         slider_hbox.addLayout(img_vbox)
 
         img_slider_vbox = QVBoxLayout()
@@ -180,6 +181,10 @@ class VolumeSegmenter(SliceBrowser):
             img_min, img_max, img_max, self._update_img_scale
         )
         img_slider_vbox.addWidget(self._img_max_slider)
+
+        self._brain_alpha_slider = make_slider(0, 100, 20, self._update_brain_alpha)
+        img_slider_vbox.addWidget(self._brain_alpha_slider)
+
         slider_hbox.addLayout(img_slider_vbox)
 
         button_vbox = QVBoxLayout()
@@ -210,6 +215,14 @@ class VolumeSegmenter(SliceBrowser):
 
         super()._configure_status_bar(hbox=hbox)
         return hbox
+
+    def _update_brain_alpha(self):
+        """Change the alpha level of the brain."""
+        alpha = self._brain_alpha_slider.value() / 100
+        for actor in (self._lh_actor, self._rh_actor):
+            if actor is not None:
+                actor.GetProperty().SetOpacity(alpha)
+        self._renderer._update()
 
     def _export_surface(self):
         """Export the surface to a file."""

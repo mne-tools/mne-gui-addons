@@ -403,7 +403,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
         if self._lh is not None and self._rh is not None:
-            self._renderer.mesh(
+            self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
                 color="white",
@@ -411,7 +411,7 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
-            self._renderer.mesh(
+            self._rh_actor, _ = self._renderer.mesh(
                 *self._rh["rr"].T * 1000,
                 triangles=self._rh["tris"],
                 color="white",
@@ -419,6 +419,8 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
+        else:
+            self._lh_actor = self._rh_actor = None
         self._renderer.set_camera(
             azimuth=90, elevation=90, distance=300, focalpoint=tuple(self._ras)
         )
