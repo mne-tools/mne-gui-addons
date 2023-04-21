@@ -21,6 +21,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "numpydoc",
     "sphinx_gallery.gen_gallery",
+    "sphinxcontrib.bibtex",
+    "sphinxcontrib.youtube",
 ]
 templates_path = ["_templates"]
 source_suffix = ".rst"
@@ -39,6 +41,7 @@ intersphinx_mapping = {
         "https://dipy.org/documentation/latest/objects.inv/",
     ),
     "mne": ("https://mne.tools/stable", None),
+    "mne_bids": ("https://mne.tools/mne-bids/stable", None),
 }
 numpydoc_class_members_toctree = False
 numpydoc_attributes_as_param_list = True
@@ -156,3 +159,8 @@ html_show_sourcelink = False
 html_copy_source = False
 html_show_sphinx = False
 htmlhelp_basename = "mne-gui-addons-doc"
+
+# sphinxcontrib-bibtex
+bibtex_bibfiles = ["./references.bib"]
+bibtex_style = "unsrt"
+bibtex_footbibliography_header = ""
