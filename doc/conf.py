@@ -21,7 +21,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "numpydoc",
     "sphinx_gallery.gen_gallery",
-    'sphinxcontrib.bibtex',
+    "sphinxcontrib.bibtex",
 ]
 templates_path = ["_templates"]
 source_suffix = ".rst"
@@ -159,6 +159,6 @@ html_show_sphinx = False
 htmlhelp_basename = "mne-gui-addons-doc"
 
 # sphinxcontrib-bibtex
-bibtex_bibfiles = ['./references.bib']
-bibtex_style = 'unsrt'
-bibtex_footbibliography_header = ''
+bibtex_bibfiles = ["./references.bib"]
+bibtex_style = "unsrt"
+bibtex_footbibliography_header = ""
