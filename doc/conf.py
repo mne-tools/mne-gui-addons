@@ -22,6 +22,7 @@ extensions = [
     "numpydoc",
     "sphinx_gallery.gen_gallery",
     "sphinxcontrib.bibtex",
+    "sphinxcontrib.youtube",
 ]
 templates_path = ["_templates"]
 source_suffix = ".rst"
@@ -40,6 +41,7 @@ intersphinx_mapping = {
         "https://dipy.org/documentation/latest/objects.inv/",
     ),
     "mne": ("https://mne.tools/stable", None),
+    "mne_bids": ("https://mne.tools/mne-bids/stable", None),
 }
 numpydoc_class_members_toctree = False
 numpydoc_attributes_as_param_list = True
