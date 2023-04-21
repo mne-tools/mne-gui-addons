@@ -74,6 +74,21 @@ _N_COLORS = len(_UNIQUE_COLORS)
 _CMAP = LinearSegmentedColormap.from_list("colors", _UNIQUE_COLORS, N=_N_COLORS)
 
 
+def _get_volume_info(img):
+    header = img.header
+    version = header['version']
+    vol_info = dict(head=[20])
+    if version == 1:
+        version = f'{version}  # volume info valid'
+        vol_info['valid'] = version
+        vol_info['filename'] = img.get_filename()
+        vol_info['volume'] = header['dims'][:3]
+        vol_info['voxelsize'] = header['delta']
+        vol_info['xras'], vol_info['yras'], vol_info['zras'] = header['Mdc']
+        vol_info['cras'] = header['Pxyz_c']
+    return vol_info
+
+
 @verbose
 def _load_image(img, verbose=None):
     """Load data from a 3D image file (e.g. CT, MR)."""
@@ -95,7 +110,7 @@ def _load_image(img, verbose=None):
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
     vox_ras_t = np.dot(orig_mgh.header.get_vox2ras_tkr(), aff_trans)
     vox_scan_ras_t = np.dot(orig_mgh.header.get_vox2ras(), aff_trans)
-    return img_data, vox_ras_t, vox_scan_ras_t
+    return img_data, vox_ras_t, vox_scan_ras_t, _get_volume_info(orig_mgh)
 
 
 def _make_mpl_plot(
@@ -203,7 +218,7 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, self._mri_vox_ras_t, self._mri_vox_scan_ras_t = _load_image(
+            self._mri_data, self._mri_vox_ras_t, self._mri_vox_scan_ras_t, self._vol_info = _load_image(
                 op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
             )
             self._mri_ras_vox_t = np.linalg.inv(self._mri_vox_ras_t)
@@ -216,7 +231,7 @@ class SliceBrowser(QMainWindow):
             self._vox_ras_t = self._mri_vox_ras_t
             self._vox_scan_ras_t = self._mri_vox_scan_ras_t
         else:
-            self._base_data, self._vox_ras_t, self._vox_scan_ras_t = _load_image(
+            self._base_data, self._vox_ras_t, self._vox_scan_ras_t, self._vol_info = _load_image(
                 base_image
             )
             if self._mri_data is not None and check_aligned:

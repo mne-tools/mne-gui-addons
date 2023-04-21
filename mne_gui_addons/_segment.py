@@ -6,7 +6,7 @@
 # License: BSD (3-clause)
 
 import numpy as np
-from mne.surface import _marching_cubes
+from mne.surface import _marching_cubes, write_surface
 from mne.transforms import apply_trans
 
 from ._core import SliceBrowser, _CMAP, _N_COLORS
@@ -19,6 +19,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QSlider,
     QPushButton,
+    QFileDialog
 )
 
 
@@ -196,6 +197,28 @@ class VolumeSegmenter(SliceBrowser):
 
         return slider_hbox
 
+    def _configure_status_bar(self):
+        """Configure the status bar."""
+        hbox = QHBoxLayout()
+
+        self._export_button = QPushButton('Export')
+        self._export_button.released.connect(self._export_surface)
+        self._export_button.setEnabled(False)
+        hbox.addWidget(self._export_button)
+
+        hbox.addStretch(1)
+
+        super()._configure_status_bar(hbox=hbox)
+        return hbox
+
+    def _export_surface(self):
+        """Export the surface to a file."""
+        fname, _ = QFileDialog.getSaveFileName(self, 'Export Filename')
+        if not fname:
+            return
+        write_surface(fname, self.verts, self.tris, volume_info=self._vol_info,
+                      overwrite=True)
+
     def set_clim(self, vmin=None, vmax=None):
         """Set the color limits of the image.
 
@@ -287,6 +310,7 @@ class VolumeSegmenter(SliceBrowser):
         self._vol_coords.pop()
         if not self._vol_coords:
             self._undo_button.setEnabled(False)
+            self._export_button.setEnabled(False)
         voxels = self._vol_coords[-1] if self._vol_coords else set()
         self._vol_img = np.zeros(self._base_data.shape) * np.nan
         for voxel in voxels:
@@ -297,6 +321,7 @@ class VolumeSegmenter(SliceBrowser):
     def _mark(self):
         """Mark the volume with the current tolerance and location."""
         self._undo_button.setEnabled(True)
+        self._export_button.setEnabled(True)
         voxels = _voxel_neighbors(
             self._vox, self._base_data, self._tol_slider.value() / 100
         )
