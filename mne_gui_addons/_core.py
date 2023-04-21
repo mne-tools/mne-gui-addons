@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
     QMessageBox,
     QWidget,
     QLineEdit,
+    QSlider,
 )
 
 from matplotlib import patheffects
@@ -92,6 +93,12 @@ def _make_mpl_plot(
         ax.set_xticks([])
         ax.set_yticks([])
     return canvas, fig
+
+
+def make_label(name):
+    label = QLabel(name)
+    label.setAlignment(QtCore.Qt.AlignCenter)
+    return label
 
 
 class SliceBrowser(QMainWindow):
@@ -331,42 +338,37 @@ class SliceBrowser(QMainWindow):
                 [1],
             )[0]
             # marching cubes transposes dimensions so flip
-            rr = apply_trans(self._vox_ras_t, rr[:, ::-1])
-            self._renderer.mesh(
-                *rr.T,
-                triangles=tris,
-                color="gray",
-                opacity=0.2,
-                reset_camera=False,
-                render=False,
-            )
-            self._renderer.set_camera(focalpoint=rr.mean(axis=0))
-        else:
-            self._renderer.mesh(
-                *self._head["rr"].T * 1000,
-                triangles=self._head["tris"],
-                color="gray",
-                opacity=0.2,
-                reset_camera=False,
-                render=False,
-            )
+            rr = apply_trans(self._vox_ras_t, rr[:, ::-1]) / 1000
+            self._head = dict(rr=rr, tris=tris)
+
+        self._head_actor, _ = self._renderer.mesh(
+            *self._head["rr"].T * 1000,
+            triangles=self._head["tris"],
+            color="gray",
+            opacity=0.2,
+            reset_camera=False,
+            render=False,
+        )
+
         if self._lh is not None and self._rh is not None:
-            self._renderer.mesh(
+            self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
-                color="white",
+                color="gray",
                 opacity=0.2,
                 reset_camera=False,
                 render=False,
             )
-            self._renderer.mesh(
+            self._rh_actor, _ = self._renderer.mesh(
                 *self._rh["rr"].T * 1000,
                 triangles=self._rh["tris"],
-                color="white",
+                color="gray",
                 opacity=0.2,
                 reset_camera=False,
                 render=False,
             )
+        else:
+            self._lh_actor = self._rh_actor = None
         self._renderer.set_camera(
             azimuth=90, elevation=90, distance=300, focalpoint=tuple(self._ras)
         )
@@ -402,8 +404,6 @@ class SliceBrowser(QMainWindow):
     def _update_camera(self, render=False):
         """Update the camera position."""
         self._renderer.set_camera(
-            # needs fix, distance moves when focal point updates
-            distance=self._renderer.plotter.camera.distance * 0.9,
             focalpoint=tuple(self._ras),
             reset_camera=False,
         )
@@ -610,6 +610,17 @@ class SliceBrowser(QMainWindow):
                 )
             self._set_ras(ras)
 
+    def _make_slider(self, smin, smax, sval, sfun=None):
+        slider = QSlider(QtCore.Qt.Horizontal)
+        slider.setMinimum(int(round(smin)))
+        slider.setMaximum(int(round(smax)))
+        slider.setValue(int(round(sval)))
+        slider.setTracking(False)  # only update on release
+        if sfun is not None:
+            slider.valueChanged.connect(sfun)
+        slider.keyPressEvent = self.keyPressEvent
+        return slider
+
     def _on_click(self, event, axis):
         """Move to view on MRI and CT on click."""
         if event.inaxes is self._figs[axis].axes[0]:
@@ -629,6 +640,7 @@ class SliceBrowser(QMainWindow):
         self._intensity_label.setText(
             "intensity = {:.2f}".format(self._base_data[tuple(self._current_slice)])
         )
+        self._update_camera(render=True)
 
     @safe_event
     def closeEvent(self, event):

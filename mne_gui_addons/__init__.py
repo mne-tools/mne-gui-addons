@@ -23,7 +23,7 @@ except PackageNotFoundError:
 def locate_ieeg(
     info,
     trans,
-    base_image,
+    base_image=None,
     subject=None,
     subjects_dir=None,
     groups=None,
@@ -37,10 +37,11 @@ def locate_ieeg(
     ----------
     %(info_not_none)s
     %(trans_not_none)s
-    base_image : path-like | nibabel.spatialimages.SpatialImage
+    base_image : path-like | nibabel.spatialimages.SpatialImage | None
         The CT or MR image on which the electrode contacts can located. It
         must be aligned to the Freesurfer T1 if ``subject`` and
-        ``subjects_dir`` are provided. Path-like inputs and nibabel image
+        ``subjects_dir`` are provided. If aligning a grid to the pial surface,
+        the T1 will be used by default. Path-like inputs and nibabel image
         objects are supported.
     %(subject)s
     %(subjects_dir)s

@@ -7,6 +7,9 @@
 
 import numpy as np
 import platform
+from functools import partial
+
+from pandas import read_csv
 
 from scipy.ndimage import maximum_filter
 
@@ -20,17 +23,29 @@ from qtpy.QtWidgets import (
     QWidget,
     QAbstractItemView,
     QListView,
-    QSlider,
     QPushButton,
     QComboBox,
+    QSpinBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QInputDialog,
+    QGraphicsView,
+    QGraphicsProxyWidget,
+    QGraphicsScene,
 )
 
 from matplotlib.colors import LinearSegmentedColormap
 
-from ._core import SliceBrowser
+from ._core import SliceBrowser, make_label
 from mne.channels import make_dig_montage
 from mne.surface import _voxel_neighbors
-from mne.transforms import apply_trans, _get_trans, invert_transform
+from mne.transforms import (
+    apply_trans,
+    _get_trans,
+    invert_transform,
+    translation,
+    rotation3d,
+)
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
 
@@ -86,7 +101,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self,
         info,
         trans,
-        base_image,
+        base_image=None,
         subject=None,
         subjects_dir=None,
         groups=None,
@@ -113,6 +128,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # initialize channel data
         self._ch_index = 0
+
+        # initialize grid data
+        self._grid_ch_index = 0
+        self._grid_pos = None
+        self._grid_radius = None
+        self._grid_actors = None
+        self._grid_meshes = None
+
         # load data, apply trans
         self._head_mri_t = _get_trans(trans, "head", "mri")[0]
         self._mri_head_t = invert_transform(self._head_mri_t)
@@ -167,9 +190,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
         toolbar = self._configure_toolbar()
         slider_bar = self._configure_sliders()
         status_bar = self._configure_status_bar()
+        self._grid_layout = self._configure_grid_layout()
         self._ch_list = self._configure_channel_sidebar()  # need for updating
 
         plot_layout = QHBoxLayout()
+        plot_layout.addLayout(self._grid_layout)
         plot_layout.addLayout(self._plt_grid)
         plot_layout.addWidget(self._ch_list)
 
@@ -182,6 +207,265 @@ class IntracranialElectrodeLocator(SliceBrowser):
         central_widget = QWidget()
         central_widget.setLayout(main_vbox)
         self.setCentralWidget(central_widget)
+
+    def _configure_grid_layout(self):
+        """Configure the sidebar for aliging a grid."""
+        grid_layout = QHBoxLayout()
+
+        show_grid_button = QPushButton("Add Grid")
+
+        # rotate to vertical
+        self._show_grid_view = QGraphicsView()
+        scene = QGraphicsScene(self._show_grid_view)
+        self._show_grid_view.setScene(scene)
+        proxy = QGraphicsProxyWidget()
+        proxy.setWidget(show_grid_button)
+        proxy.setTransformOriginPoint(proxy.boundingRect().center())
+        proxy.setRotation(270)
+        scene.addItem(proxy)
+
+        show_grid_button.released.connect(self._toggle_add_grid)
+        self._show_grid_view.setMaximumWidth(40)
+        grid_layout.addWidget(self._show_grid_view)
+
+        self._add_grid_widget = QWidget()
+        self._add_grid_widget.setVisible(False)
+
+        add_grid_layout = QVBoxLayout()
+
+        grid_spec_layouts = [QHBoxLayout() for _ in range(4)]
+
+        self._x_spin_box = QSpinBox()
+        self._x_spin_box.setRange(1, 1000)
+        self._x_spin_box.setValue(32)
+        grid_spec_layouts[0].addWidget(make_label("x dimension"))
+        grid_spec_layouts[0].addWidget(self._x_spin_box)
+
+        self._y_spin_box = QSpinBox()
+        self._y_spin_box.setRange(1, 1000)
+        self._y_spin_box.setValue(32)
+        grid_spec_layouts[1].addWidget(make_label("y dimension"))
+        grid_spec_layouts[1].addWidget(self._y_spin_box)
+
+        self._radius_spin_box = QDoubleSpinBox()
+        self._radius_spin_box.setRange(0, 10)
+        self._radius_spin_box.setValue(0.3)
+        grid_spec_layouts[2].addWidget(make_label("radius mm"))
+        grid_spec_layouts[2].addWidget(self._radius_spin_box)
+
+        self._pitch_spin_box = QDoubleSpinBox()
+        self._pitch_spin_box.setRange(0, 1000)
+        self._pitch_spin_box.setValue(1)
+        grid_spec_layouts[3].addWidget(make_label("pitch (spacing) mm"))
+        grid_spec_layouts[3].addWidget(self._pitch_spin_box)
+
+        for grid_spec_layout in grid_spec_layouts:
+            add_grid_layout.addLayout(grid_spec_layout)
+
+        button_layout = QHBoxLayout()
+
+        create_button = QPushButton("Create")
+        create_button.released.connect(self._create_grid)
+        button_layout.addWidget(create_button)
+
+        import_button = QPushButton("Import")
+        import_button.released.connect(self._import_grid)
+        button_layout.addWidget(import_button)
+
+        hide_button = QPushButton("Hide")
+        hide_button.released.connect(self._toggle_add_grid)
+        button_layout.addWidget(hide_button)
+
+        add_grid_layout.addLayout(button_layout)
+
+        self._add_grid_widget.setLayout(add_grid_layout)
+        grid_layout.addWidget(self._add_grid_widget)
+
+        self._move_grid_widget = QWidget()
+        self._move_grid_widget.setVisible(False)
+
+        move_grid_layout = QVBoxLayout()
+
+        step_size_layout = QHBoxLayout()
+        step_size_layout.addWidget(make_label("Step Size"))
+        self._step_size_slider = self._make_slider(1, 200, 100)
+        step_size_layout.addWidget(self._step_size_slider)
+        move_grid_layout.addLayout(step_size_layout)
+
+        buttons = dict()
+        for trans_type in ("translation", "rotation"):
+            move_grid_layout.addWidget(make_label(trans_type.capitalize()))
+            for direction in ("x", "y", "z"):
+                direction_layout = QHBoxLayout()
+                buttons[("left", trans_type, direction)] = QPushButton("<")
+                buttons[("right", trans_type, direction)] = QPushButton(">")
+                buttons[("left", trans_type, direction)].released.connect(
+                    partial(
+                        self._move_grid,
+                        step=-1,
+                        trans_type=trans_type,
+                        direction=direction,
+                    )
+                )
+                buttons[("right", trans_type, direction)].released.connect(
+                    partial(
+                        self._move_grid,
+                        step=1,
+                        trans_type=trans_type,
+                        direction=direction,
+                    )
+                )
+                direction_layout.addWidget(buttons[("left", trans_type, direction)])
+                direction_layout.addWidget(make_label(direction))
+                direction_layout.addWidget(buttons[("right", trans_type, direction)])
+                move_grid_layout.addLayout(direction_layout)
+            move_grid_layout.addStretch(1)
+
+        move_grid_layout.addStretch(1)
+
+        alpha_layout = QHBoxLayout()
+        alpha_layout.addWidget(make_label("Brain Alpha"))
+        self._brain_alpha_slider = self._make_slider(
+            0, 100, 20, self._update_brain_alpha
+        )
+        alpha_layout.addWidget(self._brain_alpha_slider)
+        move_grid_layout.addLayout(alpha_layout)
+
+        move_grid_layout.addStretch(1)
+
+        button_layout = [QHBoxLayout(), QHBoxLayout()]
+
+        next_button = QPushButton("Next")
+        next_button.released.connect(self._next_grid)
+        button_layout[0].addWidget(next_button)
+
+        mark_button = QPushButton("Mark")
+        mark_button.released.connect(self._mark_grid)
+        button_layout[0].addWidget(mark_button)
+
+        auto_mark_button = QPushButton("Auto Mark")
+        auto_mark_button.released.connect(self._auto_mark_grid)
+        button_layout[0].addWidget(auto_mark_button)
+
+        self._undo_button = QPushButton("Undo")
+        self._undo_button.setEnabled(False)
+        self._undo_button.released.connect(self._undo_grid)
+        button_layout[1].addWidget(self._undo_button)
+
+        remove_button = QPushButton("Remove")
+        remove_button.released.connect(self._remove_grid)
+        button_layout[1].addWidget(remove_button)
+
+        hide_button = QPushButton("Hide")
+        hide_button.released.connect(self._toggle_add_grid)
+        button_layout[1].addWidget(hide_button)
+
+        move_grid_layout.addLayout(button_layout[0])
+        move_grid_layout.addLayout(button_layout[1])
+
+        self._move_grid_widget.setLayout(move_grid_layout)
+        grid_layout.addWidget(self._move_grid_widget)
+        return grid_layout
+
+    def _toggle_add_grid(self):
+        """Toggle whether the add grid menu is collapsed."""
+        self._show_grid_view.setVisible(not self._show_grid_view.isVisible())
+        if self._grid_pos is None:
+            self._add_grid_widget.setVisible(not self._add_grid_widget.isVisible())
+        else:
+            self._move_grid_widget.setVisible(not self._move_grid_widget.isVisible())
+
+    def _create_grid(self):
+        """Instantiate a grid from the current position with the given specs."""
+        nx = self._x_spin_box.value()
+        ny = self._y_spin_box.value()
+        if nx * ny > len(self._ch_names):
+            QMessageBox.information(
+                self,
+                "Not enough channels",
+                f"Grid size {nx * ny} greater than {len(self._ch_names)} number of channels",
+            )
+            return
+        pitch = self._pitch_spin_box.value()
+        grid_pos = np.array(
+            [
+                (0, i, j)
+                for i in np.arange(0, nx * pitch, pitch)
+                for j in np.arange(0, ny * pitch, pitch)
+            ]
+        )
+        grid_pos -= grid_pos.mean(axis=0)
+        grid_pos += self._ras
+        self._grid_pos = [grid_pos]
+        self._grid_radius = self._radius_spin_box.value()
+        self._show_grid()
+
+    def _import_grid(self):
+        """Import grid positions from a tsv file."""
+        fname = QFileDialog.getOpenFileName(
+            self, caption="Grid", filter="(*.csv *.tsv)"
+        )
+        if not fname:
+            return
+        grid_data = read_csv(fname, sep="\t" if fname.endswith("tsv") else None)
+        grid_pos = np.array(
+            [np.zeros(len(grid_data["x"])), grid_data["x"], grid_data["y"]]
+        )
+        grid_pos -= grid_pos.mean(axis=0)
+        grid_pos += self._ras
+        self._grid_pos = [grid_pos]
+        self._grid_radius = QInputDialog.getDouble(self, "Grid Radius", "radius (mm)")
+        self._show_grid()
+
+    def _show_grid(self, selected=False):
+        """Initialize grid plotting and toggle to move grid menu."""
+        self._add_grid_widget.setVisible(False)
+        self._move_grid_widget.setVisible(True)
+        self._grid_actors = list()
+        self._grid_meshes = list()
+        for i, (x, y, z) in enumerate(self._grid_pos[-1]):
+            actor, mesh = self._renderer.sphere(
+                (x, y, z),
+                scale=self._grid_radius,
+                color="yellow"
+                if i == self._grid_ch_index
+                else ("blue" if selected else "red"),
+                opacity=1,
+            )
+            self._grid_actors.append(actor)
+            self._grid_meshes.append(mesh)
+        self._renderer._update()
+
+    def _move_grid(self, step, trans_type, direction):
+        """Translate or rotate the grid."""
+        pos = self._grid_pos[-1]
+        center = pos.mean(axis=0)
+        xyz = np.array(
+            [step * (direction == this_direction) for this_direction in ("x", "y", "z")]
+        ) * self._step_size_slider.value() / 100
+        if trans_type == "translation":
+            pos2 = pos + translation(*xyz)[:3, 3]
+        else:
+            assert trans_type == "rotation"
+            rot = rotation3d(*np.deg2rad(xyz))
+            pos2 = np.dot(rot, (pos - center).T).T + center
+        for mesh, trans in zip(self._grid_meshes, pos2 - pos):
+            mesh.translate(trans, inplace=True)
+        self._grid_pos.append(pos2)
+        self._undo_button.setEnabled(True)
+        self._renderer._update()
+
+    def _remove_grid(self):
+        """Remove the existing grid."""
+        for actor in self._grid_actors:
+            self._renderer.plotter.remove_actor(actor)
+        self._grid_pos = None
+        self._grid_radius = None
+        self._grid_actors = None
+        self._grid_meshes = None
+        self._add_grid_widget.setVisible(True)
+        self._move_grid_widget.setVisible(False)
+        self._renderer._update()
 
     def _configure_channel_sidebar(self):
         """Configure the sidebar to select channels/contacts."""
@@ -295,12 +579,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if name in self._3d_chs:
             self._renderer.plotter.remove_actor(self._3d_chs.pop(name), render=False)
         if not any(np.isnan(self._chs[name])):
-            self._3d_chs[name] = self._renderer.sphere(
+            self._3d_chs[name], _ = self._renderer.sphere(
                 tuple(self._chs[name]),
                 scale=1,
                 color=_CMAP(self._groups[name])[:3],
                 opacity=self._ch_alpha,
-            )[0]
+            )
             # The actor scale is managed differently than the glyph scale
             # in order not to recreate objects, we use the actor scale
             self._3d_chs[name].SetOrigin(self._chs[name])
@@ -326,6 +610,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._toggle_snap()  # turn on to start
 
         hbox.addStretch(1)
+
+        self._toggle_head_button = QPushButton("Hide Head")
+        self._toggle_head_button.released.connect(self._toggle_show_head)
+        hbox.addWidget(self._toggle_head_button)
 
         self._toggle_brain_button = QPushButton("Show Brain")
         self._toggle_brain_button.released.connect(self._toggle_show_brain)
@@ -365,22 +653,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _configure_sliders(self):
         """Make a bar with sliders on it."""
 
-        def make_label(name):
-            label = QLabel(name)
-            label.setAlignment(QtCore.Qt.AlignCenter)
-            return label
-
-        def make_slider(smin, smax, sval, sfun=None):
-            slider = QSlider(QtCore.Qt.Horizontal)
-            slider.setMinimum(int(round(smin)))
-            slider.setMaximum(int(round(smax)))
-            slider.setValue(int(round(sval)))
-            slider.setTracking(False)  # only update on release
-            if sfun is not None:
-                slider.valueChanged.connect(sfun)
-            slider.keyPressEvent = self.keyPressEvent
-            return slider
-
         slider_hbox = QHBoxLayout()
 
         ch_vbox = QVBoxLayout()
@@ -389,12 +661,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         slider_hbox.addLayout(ch_vbox)
 
         ch_slider_vbox = QVBoxLayout()
-        self._alpha_slider = make_slider(
+        self._alpha_slider = self._make_slider(
             0, 100, self._ch_alpha * 100, self._update_ch_alpha
         )
         ch_plot_max = _CH_PLOT_SIZE // 50  # max 1 / 50 of plot size
         ch_slider_vbox.addWidget(self._alpha_slider)
-        self._radius_slider = make_slider(
+        self._radius_slider = self._make_slider(
             0, ch_plot_max, self._radius, self._update_radius
         )
         ch_slider_vbox.addWidget(self._radius_slider)
@@ -408,9 +680,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
         ct_slider_vbox = QVBoxLayout()
         ct_min = int(round(np.nanmin(self._ct_data)))
         ct_max = int(round(np.nanmax(self._ct_data)))
-        self._ct_min_slider = make_slider(ct_min, ct_max, ct_min, self._update_ct_scale)
+        self._ct_min_slider = self._make_slider(
+            ct_min, ct_max, ct_min, self._update_ct_scale
+        )
         ct_slider_vbox.addWidget(self._ct_min_slider)
-        self._ct_max_slider = make_slider(ct_min, ct_max, ct_max, self._update_ct_scale)
+        self._ct_max_slider = self._make_slider(
+            ct_min, ct_max, ct_max, self._update_ct_scale
+        )
         ct_slider_vbox.addWidget(self._ct_max_slider)
         slider_hbox.addLayout(ct_slider_vbox)
         return slider_hbox
@@ -567,6 +843,47 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._ch_index = (self._ch_index + 1) % len(self._ch_names)
         self._update_ch_selection()
 
+    def _update_grid_selection(self, selected=False):
+        """Update which grid channel is selected."""
+        # remove selected yellow sphere, replace with gray
+        self._renderer.plotter.remove_actor(self._grid_meshes[self._grid_ch_index])
+        actor, mesh = self._renderer.sphere(
+            tuple(self._grid_pos[-1][self._grid_ch_index]),
+            scale=self._grid_radius,
+            color="blue" if selected else "gray",
+            opacity=1,
+        )
+        self._grid_actors[self._grid_ch_index] = actor
+        self._grid_meshes[self._grid_ch_index] = mesh
+
+        self._grid_ch_index = (self._grid_ch_index + 1) % self._grid_pos[-1].size
+
+        # remove gray sphere, replace with yellow
+        actor, mesh = self._renderer.sphere(
+            tuple(self._grid_pos[-1][self._grid_ch_index]),
+            scale=self._grid_radius,
+            color="yellow",
+            opacity=1,
+        )
+        self._grid_actors[self._grid_ch_index] = actor
+        self._grid_meshes[self._grid_ch_index] = mesh
+        self._renderer._update()
+
+    def _undo_grid(self):
+        """Put the grid back in the last position."""
+        pos2 = self._grid_pos.pop()
+        pos = self._grid_pos[-1]
+        for mesh, trans in zip(self._grid_meshes, pos2 - pos):
+            mesh.translate(trans, inplace=True)
+        self._renderer._update()
+        if len(self._grid_pos) < 2:
+            self._undo_button.setEnabled(False)
+
+    def _next_grid(self):
+        """Increment the grid selection index."""
+        self._grid_ch_index = (self._grid_ch_index + 1) % len(self._grid_pos[-1].shape[0])
+        self._update_grid_selection()
+
     def _color_list_item(self, name=None):
         """Color the item in the view list for easy id of marked channels."""
         name = self._ch_names[self._ch_index] if name is None else name
@@ -600,6 +917,39 @@ class IntracranialElectrodeLocator(SliceBrowser):
         else:  # text == 'On', turn off
             self._snap_button.setText("Off")
             self._snap_button.setStyleSheet("background-color: red")
+
+    def _auto_mark_grid(self):
+        """Mark a large grid based on the first two or more entries."""
+        if len(self._ch_names) - self._ch_index < self._grid_pos[-1].shape[0]:
+            QMessageBox.information(
+                self,
+                "Not enough channels",
+                f"Grid size {self._grid_pos[-1].shape[0]} greater than "
+                f"{len(self._ch_names) - self._ch_index} number of channels below selection",
+            )
+            return
+        for pos, ch in zip(
+            self._grid_pos[-1],
+            self._ch_names[self._ch_index : self._ch_index + self._grid_pos[-1].size],
+        ):
+            self._chs[ch] = pos
+            self._color_list_item()
+        for actor in self._grid_actors:
+            self._renderer.plotter.remove_actor(actor, render=False)
+        self._show_grid(selected=True)
+        self._save_ch_coords()
+        self._ch_list.setFocus()
+
+    def _mark_grid(self):
+        """Mark a channel on the grid."""
+        self._chs[self._ch_names[self._ch_index]] = self._grid_pos[-1][
+            self._grid_ch_index
+        ]
+        self._update_grid_selection(selected=True)
+        self._color_list_item()
+        self._save_ch_coords()
+        self._next_ch()
+        self._ch_list.setFocus()
 
     @Slot()
     def mark_channel(self, ch=None):
@@ -744,6 +1094,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._renderer._update()
         self._ch_list.setFocus()  # remove focus from 3d plotter
 
+    def _update_brain_alpha(self):
+        """Change the alpha level of the brain."""
+        alpha = self._brain_alpha_slider.value() / 100
+        for actor in (self._lh_actor, self._rh_actor):
+            if actor is not None:
+                actor.GetProperty().SetOpacity(alpha)
+        self._renderer._update()
+        self._ch_list.setFocus()  # remove focus from 3d plotter
+
     def _show_help(self):
         """Show the help menu."""
         QMessageBox.information(
@@ -849,6 +1208,21 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._images.pop("local_max")
             self._toggle_show_max_button.setText("Show Maxima")
         self._draw()
+
+    def _toggle_show_head(self):
+        """Toggle whether the seghead/marching cubes head is shown."""
+        if self._head_actor:
+            self._toggle_head_button.setText("Show Head")
+            self._renderer.plotter.remove_actor(self._head_actor)
+        else:
+            self._toggle_head_button.setText("Hide Head")
+            self._head_actor = self._renderer.mesh(
+                *self._head["rr"].T * 1000,
+                triangles=self._head["tris"],
+                color="gray",
+                opacity=0.2,
+                reset_camera=False,
+            )
 
     def _toggle_show_brain(self):
         """Toggle whether the brain/MRI is being shown."""
