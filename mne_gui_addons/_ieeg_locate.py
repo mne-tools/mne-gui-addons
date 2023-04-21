@@ -846,7 +846,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _update_grid_selection(self, selected=False):
         """Update which grid channel is selected."""
         # remove selected yellow sphere, replace with gray
-        self._renderer.plotter.remove_actor(self._grid_meshes[self._grid_ch_index])
+        self._renderer.plotter.remove_actor(self._grid_actors[self._grid_ch_index])
         actor, mesh = self._renderer.sphere(
             tuple(self._grid_pos[-1][self._grid_ch_index]),
             scale=self._grid_radius,
