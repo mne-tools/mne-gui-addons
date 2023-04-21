@@ -19,7 +19,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QSlider,
     QPushButton,
-    QFileDialog
+    QFileDialog,
 )
 
 
@@ -98,8 +98,10 @@ class VolumeSegmenter(SliceBrowser):
         self._vol_actor = None
 
         super(VolumeSegmenter, self).__init__(
-            base_image=base_image, subject=subject, subjects_dir=subjects_dir,
-            check_aligned=False
+            base_image=base_image,
+            subject=subject,
+            subjects_dir=subjects_dir,
+            check_aligned=False,
         )
 
         self._vol_img = np.zeros(self._base_data.shape) * np.nan
@@ -159,7 +161,9 @@ class VolumeSegmenter(SliceBrowser):
         # no callback needed, will only be used when marked
         self._tol_slider = make_slider(0, 100, 10, None)
         slider_vbox.addWidget(self._tol_slider)
-        self._smooth_slider = make_slider(0, 100, 0, lambda x: self._plot_3d(render=True))
+        self._smooth_slider = make_slider(
+            0, 100, 0, lambda x: self._plot_3d(render=True)
+        )
         slider_vbox.addWidget(self._smooth_slider)
 
         slider_hbox.addLayout(slider_vbox)
@@ -206,7 +210,7 @@ class VolumeSegmenter(SliceBrowser):
         """Configure the status bar."""
         hbox = QHBoxLayout()
 
-        self._export_button = QPushButton('Export')
+        self._export_button = QPushButton("Export")
         self._export_button.released.connect(self._export_surface)
         self._export_button.setEnabled(False)
         hbox.addWidget(self._export_button)
@@ -226,11 +230,12 @@ class VolumeSegmenter(SliceBrowser):
 
     def _export_surface(self):
         """Export the surface to a file."""
-        fname, _ = QFileDialog.getSaveFileName(self, 'Export Filename')
+        fname, _ = QFileDialog.getSaveFileName(self, "Export Filename")
         if not fname:
             return
-        write_surface(fname, self.verts, self.tris, volume_info=self._vol_info,
-                      overwrite=True)
+        write_surface(
+            fname, self.verts, self.tris, volume_info=self._vol_info, overwrite=True
+        )
 
     def set_clim(self, vmin=None, vmax=None):
         """Set the color limits of the image.

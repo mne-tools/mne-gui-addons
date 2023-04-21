@@ -76,16 +76,16 @@ _CMAP = LinearSegmentedColormap.from_list("colors", _UNIQUE_COLORS, N=_N_COLORS)
 
 def _get_volume_info(img):
     header = img.header
-    version = header['version']
+    version = header["version"]
     vol_info = dict(head=[20])
     if version == 1:
-        version = f'{version}  # volume info valid'
-        vol_info['valid'] = version
-        vol_info['filename'] = img.get_filename()
-        vol_info['volume'] = header['dims'][:3]
-        vol_info['voxelsize'] = header['delta']
-        vol_info['xras'], vol_info['yras'], vol_info['zras'] = header['Mdc']
-        vol_info['cras'] = header['Pxyz_c']
+        version = f"{version}  # volume info valid"
+        vol_info["valid"] = version
+        vol_info["filename"] = img.get_filename()
+        vol_info["volume"] = header["dims"][:3]
+        vol_info["voxelsize"] = header["delta"]
+        vol_info["xras"], vol_info["yras"], vol_info["zras"] = header["Mdc"]
+        vol_info["cras"] = header["Pxyz_c"]
     return vol_info
 
 
@@ -218,9 +218,12 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, self._mri_vox_ras_t, self._mri_vox_scan_ras_t, self._vol_info = _load_image(
-                op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
-            )
+            (
+                self._mri_data,
+                self._mri_vox_ras_t,
+                self._mri_vox_scan_ras_t,
+                self._vol_info,
+            ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
             self._mri_ras_vox_t = np.linalg.inv(self._mri_vox_ras_t)
             self._mri_scan_ras_vox_t = np.linalg.inv(self._mri_vox_scan_ras_t)
 
@@ -231,9 +234,12 @@ class SliceBrowser(QMainWindow):
             self._vox_ras_t = self._mri_vox_ras_t
             self._vox_scan_ras_t = self._mri_vox_scan_ras_t
         else:
-            self._base_data, self._vox_ras_t, self._vox_scan_ras_t, self._vol_info = _load_image(
-                base_image
-            )
+            (
+                self._base_data,
+                self._vox_ras_t,
+                self._vox_scan_ras_t,
+                self._vol_info,
+            ) = _load_image(base_image)
             if self._mri_data is not None and check_aligned:
                 if self._mri_data.shape != self._base_data.shape or not np.allclose(
                     self._vox_ras_t, self._mri_vox_ras_t, rtol=1e-6
