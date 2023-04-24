@@ -142,11 +142,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # initialize grid data
         self._grid_ch_index = 0
-        self._grid_pos = self._grid_radius = None
-        self._grid_actor = self._grid_mesh = None
-        self._grid_actors = self._grid_meshes = None
+        self._grid_pos = None
+        self._grid_radius = None
+        self._grid_actor = None
+        self._grid_mesh = None
+        self._grid_actors = None
+        self._grid_meshes = None
         self._grid_collision_dectors = list()
-        self._skull_actor = self._skull_mesh = None
+        self._skull_actor = None
+        self._skull_mesh = None
         self._surgical_image_chart = self._surgical_image = None
         self._surf_actors = list()
 
