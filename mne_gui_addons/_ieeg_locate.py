@@ -13,6 +13,7 @@ from functools import partial
 from pandas import read_csv
 
 from scipy.ndimage import maximum_filter
+from scipy.spatial import Delaunay
 
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Slot, Signal
@@ -38,9 +39,9 @@ from qtpy.QtWidgets import (
 from matplotlib.pyplot import Figure, imread
 from matplotlib.colors import LinearSegmentedColormap
 
-from ._core import SliceBrowser, make_label, _load_image
+from ._core import SliceBrowser, make_label
 from mne.channels import make_dig_montage
-from mne.surface import _voxel_neighbors, read_surface, _marching_cubes
+from mne.surface import _voxel_neighbors, read_surface, decimate_surface
 from mne.transforms import (
     apply_trans,
     _get_trans,
@@ -52,6 +53,11 @@ from mne.transforms import (
 )
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
+
+from pyvista import vtk_points
+from vtkmodules.vtkCommonMath import vtkMatrix4x4
+from vtkmodules.vtkCommonTransforms import vtkTransform
+from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
 
 _CH_PLOT_SIZE = 1024
 _RADIUS_SCALAR = 0.4
@@ -135,12 +141,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # initialize grid data
         self._grid_ch_index = 0
-        self._grid_pos = None
-        self._grid_radius = None
-        self._grid_actors = None
-        self._grid_meshes = None
+        self._grid_pos = self._grid_radius = None
+        self._grid_actor = self._grid_mesh = None
+        self._grid_actors = self._grid_meshes = None
+        self._grid_collision_dectors = list()
         self._skull_actor = self._skull_mesh = None
-        self._surgical_image_chart = None
+        self._surgical_image_chart = self._surgical_image = None
         self._surf_actors = list()
 
         # load data, apply trans
@@ -303,7 +309,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 buttons[("left", trans_type, direction)].released.connect(
                     partial(
                         self._move_grid,
-                        step=-1,
+                        step=1,
                         trans_type=trans_type,
                         direction=direction,
                     )
@@ -311,7 +317,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 buttons[("right", trans_type, direction)].released.connect(
                     partial(
                         self._move_grid,
-                        step=1,
+                        step=-1,
                         trans_type=trans_type,
                         direction=direction,
                     )
@@ -361,6 +367,22 @@ class IntracranialElectrodeLocator(SliceBrowser):
         )
         surgical_image_height_hbox.addWidget(self._surgical_image_height_slider)
         surgical_image_sliders_vbox.addLayout(surgical_image_height_hbox)
+
+        surgical_image_xscale_hbox = QHBoxLayout()
+        surgical_image_xscale_hbox.addWidget(make_label("X Scale"))
+        self._surgical_image_xscale_slider = self._make_slider(
+            0, 100, 100, self._update_surgical_image_xscale
+        )
+        surgical_image_xscale_hbox.addWidget(self._surgical_image_xscale_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_xscale_hbox)
+
+        surgical_image_yscale_hbox = QHBoxLayout()
+        surgical_image_yscale_hbox.addWidget(make_label("Y Scale"))
+        self._surgical_image_yscale_slider = self._make_slider(
+            0, 100, 100, self._update_surgical_image_yscale
+        )
+        surgical_image_yscale_hbox.addWidget(self._surgical_image_yscale_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_yscale_hbox)
 
         surgical_image_hbox.addLayout(surgical_image_sliders_vbox)
 
@@ -454,10 +476,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
             fig = Figure()
             ax = fig.add_axes([0, 0, 1, 1])
             ax.axis("off")
-            ax.imshow(im_data, aspect="auto")
+            self._surgical_image = ax.imshow(im_data, aspect="auto", alpha=0.4)
             self._surgical_image_chart = ChartMPL(fig, size=(1, 1), loc=(0, 0))
-            self._surgical_image_chart.background_color = (1.0, 1.0, 1.0, 0.4)
-
+            self._renderer.plotter.add_chart(self._surgical_image_chart)
         else:
             if self._surgical_image_button.text() == "Show Surgical Image":
                 self._surgical_image_chart.visible = True
@@ -465,26 +486,47 @@ class IntracranialElectrodeLocator(SliceBrowser):
             else:
                 self._surgical_image_chart.visible = False
                 self._surgical_image_button.setText("Show Surgical Image")
-            self._renderer._update()
+        self._renderer._update()
 
     def _update_surgical_image_alpha(self):
         """Update the opacity of the surgical image."""
         alpha = self._surgical_image_alpha_slider.value() / 100
-        self._surgical_image_chart.background_color = (1.0, 1.0, 1.0, alpha)
+        self._surgical_image.set_alpha(alpha)
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _update_surgical_image_width(self):
         """Update the width of the surgical image."""
         width = self._surgical_image_width_slider.value() / 100
         loc = self._surgical_image_chart.loc
-        self._surgical_image_chart.loc = (width / 2, loc[1], 1 - width / 2, loc[3])
+        size = self._surgical_image_chart.size
+        self._surgical_image_chart.loc = ((1 - width) / 2, loc[1])
+        self._surgical_image_chart.size = (width, size[1])
         self._renderer._update()
 
     def _update_surgical_image_height(self):
-        """Update the width of the surgical image."""
+        """Update the height of the surgical image."""
         height = self._surgical_image_height_slider.value() / 100
         loc = self._surgical_image_chart.loc
-        self._surgical_image_chart.loc = (loc[0], height / 2, loc[2], 1 - height / 2)
+        size = self._surgical_image_chart.size
+        self._surgical_image_chart.loc = (loc[0], (1 - height) / 2)
+        self._surgical_image_chart.size = (size[0], height)
+        self._renderer._update()
+
+    def _update_surgical_image_xscale(self):
+        """Update the x scale of the surgical image."""
+        xscale = self._surgical_image_xscale_slider.value() / 100
+        width = self._surgical_image_width_slider.value() / 100
+        size = self._surgical_image_chart.size
+        self._surgical_image_chart.size = (width * xscale, size[1])
+        self._renderer._update()
+
+    def _update_surgical_image_yscale(self):
+        """Update the y scale of the surgical image."""
+        yscale = self._surgical_image_yscale_slider.value() / 100
+        height = self._surgical_image_height_slider.value() / 100
+        size = self._surgical_image_chart.size
+        self._surgical_image_chart.size = (size[0], height * yscale)
         self._renderer._update()
 
     def _add_surface(self):
@@ -496,25 +538,28 @@ class IntracranialElectrodeLocator(SliceBrowser):
             return
         color, _ = QInputDialog.getText(self, "Surface Color", "Color?")
         rr, tris = read_surface(fname)
-        self._surf_actors.append(self._renderer.mesh(
-            *rr.T,
-            tris,
-            color=color,
-            opacity=1,
-            reset_camera=False,
-        )[0])
+        self._surf_actors.append(
+            self._renderer.mesh(
+                *rr.T,
+                tris,
+                color=color,
+                opacity=1,
+                reset_camera=False,
+            )[0]
+        )
         self._toggle_surf_button.setEnabled(True)
 
     def _toggle_show_surfaces(self):
         """Toggle whether the surface is showing."""
         if self._toggle_surf_button.text() == "Show Surface(s)":
             for actor in self._surf_actors:
-                actor.setVisible(True)
+                actor.GetProperty().SetOpacity(1)
             self._toggle_surf_button.setText("Hide Surface(s)")
         else:
             for actor in self._surf_actors:
-                actor.setVisible(False)
+                actor.GetProperty().SetOpacity(0)
             self._toggle_surf_button.setText("Show Surface(s)")
+        self._renderer._update()
 
     def _check_skull(self):
         """Check that the skull surface has been computed."""
@@ -532,6 +577,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _show_skull(self):
         """Render the 3D skull."""
         rr, tris = read_surface(op.join(self._subject_dir, "bem", "inner_skull.surf"))
+        rr, tris = decimate_surface(rr, tris, tris.shape[0] // 20)
         rr = _cart_to_sph(rr)
         rr[:, 0] *= self._skull_spin_box.value()
         rr = _sph_to_cart(rr)
@@ -550,6 +596,17 @@ class IntracranialElectrodeLocator(SliceBrowser):
             return
         if self._skull_actor is None:  # initialize
             self._show_skull()
+            for mesh in self._grid_meshes:
+                collide = vtkCollisionDetectionFilter()
+                collide.SetInputData(0, mesh)
+                collide.SetTransform(0, vtkTransform())
+                collide.SetInputData(1, self._skull_mesh)
+                collide.SetMatrix(1, vtkMatrix4x4())
+                collide.SetBoxTolerance(0.0)
+                collide.SetCellTolerance(0.0)
+                collide.SetNumberOfCellsPerNode(2)
+                collide.SetCollisionModeToFirstContact()
+                self._grid_collision_dectors.append(collide)
             self._skull_button.setText("Hide Skull")
         else:
             if self._skull_button.text() == "Show Skull":
@@ -598,6 +655,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos -= grid_pos.mean(axis=0)
         grid_pos += self._ras
         self._grid_pos = [grid_pos]
+        self._grid_tris = Delaunay(grid_pos[:, 1:]).simplices
         self._grid_radius = self._radius_spin_box.value()
         self._show_grid()
 
@@ -615,6 +673,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos -= grid_pos.mean(axis=0)
         grid_pos += self._ras
         self._grid_pos = [grid_pos]
+        self._grid_tris = Delaunay(grid_pos[:, 1:]).simplices
         self._grid_radius, _ = QInputDialog.getDouble(
             self, "Grid Radius", "radius (mm)"
         )
@@ -637,6 +696,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
             self._grid_actors.append(actor)
             self._grid_meshes.append(mesh)
+        self._grid_actor, self._grid_mesh = self._renderer.mesh(
+            *self._grid_pos[-1].T,
+            triangles=self._grid_tris,
+            color="gray",
+            opacity=0.5,
+            reset_camera=False,
+        )
         self._renderer._update()
 
     def _move_grid(self, step, trans_type, direction):
@@ -660,11 +726,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
             assert trans_type == "rotation"
             rot = rotation3d(*np.deg2rad(xyz))
             pos2 = np.dot(rot, (pos - center).T).T + center
-        for mesh, trans in zip(self._grid_meshes, pos2 - pos):
+        for i, (mesh, trans) in enumerate(zip(self._grid_meshes, pos2 - pos)):
             mesh.translate(trans, inplace=True)
-            if collide_skull and mesh.collision(self._skull_mesh)[1]:
-                mesh.translate(-trans, inplace=True)
+            if collide_skull:
+                self._grid_collision_dectors[i].Update()
+                if self._grid_collision_dectors[i].GetNumberOfContacts():
+                    mesh.translate(-trans, inplace=True)  # put back
+                    pos2[i] = pos[i]
         self._grid_pos.append(pos2)
+        self._grid_mesh.SetPoints(vtk_points(pos2))
         self._undo_button.setEnabled(True)
         self._renderer._update()
 
