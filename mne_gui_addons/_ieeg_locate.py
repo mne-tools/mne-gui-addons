@@ -641,7 +641,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             QMessageBox.information(
                 self,
                 "Not enough channels",
-                f"Grid size {nx * ny} greater than {len(self._ch_names)} number of channels",
+                f"Grid size {nx * ny} greater than {len(self._ch_names)} "
+                "number of channels",
             )
             return
         pitch = self._pitch_spin_box.value()
@@ -1210,7 +1211,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self,
                 "Not enough channels",
                 f"Grid size {self._grid_pos[-1].shape[0]} greater than "
-                f"{len(self._ch_names) - self._ch_index} number of channels below selection",
+                f"{len(self._ch_names) - self._ch_index} "
+                "number of channels below selection",
             )
             return
         for pos, ch in zip(
