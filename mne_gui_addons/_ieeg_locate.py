@@ -141,7 +141,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._grid_meshes = None
         self._skull_actor = self._skull_mesh = None
         self._surgical_image_chart = None
-        self._vasculature_actor = None
+        self._surf_actors = list()
 
         # load data, apply trans
         self._head_mri_t = _get_trans(trans, "head", "mri")[0]
@@ -367,18 +367,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout.addLayout(surgical_image_hbox)
         move_grid_layout.addStretch(1)
 
-        vasculature_hbox = QHBoxLayout()
-        self._vasculature_button = QPushButton("Add Vasculature")
-        self._vasculature_button.released.connect(self._add_remove_vasculature)
-        vasculature_hbox.addWidget(self._vasculature_button)
-        self._toggle_vasculature_button = QPushButton("Hide Vasculature")
-        self._toggle_vasculature_button.setEnabled(False)
-        self._toggle_vasculature_button.released.connect(self._toggle_vasculature)
-        vasculature_hbox.addWidget(self._toggle_vasculature_button)
-
-        move_grid_layout.addLayout(vasculature_hbox)
-        move_grid_layout.addStretch(1)
-
         skull_layout = QHBoxLayout()
 
         self._skull_button = QPushButton("Show Skull")
@@ -397,9 +385,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout.addStretch(1)
 
         surf_hbox = QHBoxLayout()
-        self._surf_add_button = QPushButton("Add Surface (e.g. Tumor)")
-        self._surf_add_button.released.connect(self._add_surface)
-        self._surf_
+        surf_add_button = QPushButton("Add Surface (e.g. Tumor)")
+        surf_add_button.released.connect(self._add_surface)
+        surf_hbox.addWidget(surf_add_button)
+        self._toggle_surf_button = QPushButton("Hide Surface(s)")
+        self._toggle_surf_button.setEnabled(False)
+        self._toggle_surf_button.released.connect(self._toggle_show_surfaces)
+        surf_hbox.addWidget(self._toggle_surf_button)
 
         move_grid_layout.addLayout(surf_hbox)
         move_grid_layout.addStretch(1)
@@ -495,61 +487,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image_chart.loc = (loc[0], height / 2, loc[2], 1 - height / 2)
         self._renderer._update()
 
-    def _add_remove_vasculature(self):
-        """Add vasculature from a registered angiogram or contrast image."""
-        if self._vasculature_actor is None:  # load image
-            fname, _ = QFileDialog.getOpenFileName(
-                self,
-                caption="Volume with Vasculature",
-                filter="(*.nii *.nii.gz *.mgz)",
-            )
-            if not fname:
-                return
-            value, _ = QInputDialog.getDouble(
-                self,
-                "Intensity",
-                "Intensity of the vasculature in the image (use freeview to check)?",
-            )
-            tol, _ = QInputDialog.getDouble(
-                self,
-                "Tolerance",
-                "Tolerance around that value to include (use freeview to check)?",
-            )
-            img_data, vox_ras_t, vox_scan_ras_t = _load_image(fname)
-            skull_mask, _, _ = _load_image(op.join(self._subject_dir, 'mri'))
-            if not np.allclose(vox_scan_ras_t, self._vox_scan_ras_t):
-                QMessageBox.information(
-                    self,
-                    "Vasculature Volume Not Aligned",
-                    f"Found {vox_scan_ras_t} affine, expected {self._vox_scan_ras_t}",
-                )
-                return
-            rr, tris = _marching_cubes(
-                np.logical_and(img_data >= value - tol, img_data <= value + tol), [1]
-            )[0]
-            rr = apply_trans(self._vox_ras_t, rr[:, ::-1])
-            self._vasculature_actor, _ = self._renderer.mesh(
-                *rr.T,
-                tris,
-                color="red",
-                opacity=1,
-                reset_camera=False,
-            )
-            self._toggle_vasculature_button.setEnabled(True)
-        else:
-            self._renderer.plotter.remove_actor(self._vasculature_actor)
-            self._toggle_vasculature_button.setEnabled(False)
-            self._vasculature_actor = None
-
-    def _toggle_vasculature(self):
-        """Toggle whether the vasculature is shown or hidden."""
-        if self._vasculature_button.text() == "Show Vasculature":
-            self._vasculature_actor.setVisible(True)
-            self._vasculature_button.setText("Hide Vasculature")
-        else:
-            self._vasculature_actor.setVisible(False)
-            self._vasculature_button.setText("Show Vasculature")
-
     def _add_surface(self):
         """Add a surface, like a tumor for visualization and collisions."""
         fname, _ = QFileDialog.getOpenFileName(
@@ -566,15 +503,18 @@ class IntracranialElectrodeLocator(SliceBrowser):
             opacity=1,
             reset_camera=False,
         )[0])
+        self._toggle_surf_button.setEnabled(True)
 
-    def _toggle_surface(self):
+    def _toggle_show_surfaces(self):
         """Toggle whether the surface is showing."""
-        if self._vasculature_button.text() == "Show Vasculature":
-            self._vasculature_actor.setVisible(True)
-            self._vasculature_button.setText("Hide Vasculature")
+        if self._toggle_surf_button.text() == "Show Surface(s)":
+            for actor in self._surf_actors:
+                actor.setVisible(True)
+            self._toggle_surf_button.setText("Hide Surface(s)")
         else:
-            self._vasculature_actor.setVisible(False)
-            self._vasculature_button.setText("Show Vasculature")
+            for actor in self._surf_actors:
+                actor.setVisible(False)
+            self._toggle_surf_button.setText("Show Surface(s)")
 
     def _check_skull(self):
         """Check that the skull surface has been computed."""
