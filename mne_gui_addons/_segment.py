@@ -210,8 +210,8 @@ class VolumeSegmenter(SliceBrowser):
         self._export_button.setEnabled(False)
         hbox.addWidget(self._export_button)
 
-        hbox.addWidget(make_label('    '))  # small break
-        hbox.addWidget(make_label('Max # Voxels'))
+        hbox.addWidget(make_label("    "))  # small break
+        hbox.addWidget(make_label("Max # Voxels"))
         self._max_n_voxels_spin_box = QSpinBox()
         self._max_n_voxels_spin_box.setRange(0, 10000)
         self._max_n_voxels_spin_box.setValue(200)
@@ -345,8 +345,10 @@ class VolumeSegmenter(SliceBrowser):
         self._undo_button.setEnabled(True)
         self._export_button.setEnabled(True)
         voxels = _voxel_neighbors(
-            self._vox, self._base_data, self._tol_slider.value() / 100,
-            self._max_n_voxels_spin_box.value()
+            self._vox,
+            self._base_data,
+            self._tol_slider.value() / 100,
+            self._max_n_voxels_spin_box.value(),
         )
         if self._vol_coords:
             voxels = voxels.union(self._vol_coords[-1])
