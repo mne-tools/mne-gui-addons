@@ -9,17 +9,17 @@ import numpy as np
 from mne.surface import _marching_cubes, write_surface
 from mne.transforms import apply_trans
 
-from ._core import SliceBrowser, _CMAP, _N_COLORS
+from ._core import SliceBrowser, _CMAP, _N_COLORS, make_label
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QWidget,
-    QLabel,
     QSlider,
     QPushButton,
     QFileDialog,
+    QSpinBox,
 )
 
 
@@ -131,11 +131,6 @@ class VolumeSegmenter(SliceBrowser):
     def _configure_sliders(self):
         """Make a bar with sliders on it."""
 
-        def make_label(name):
-            label = QLabel(name)
-            label.setAlignment(QtCore.Qt.AlignCenter)
-            return label
-
         def make_slider(smin, smax, sval, sfun=None):
             slider = QSlider(QtCore.Qt.Horizontal)
             slider.setMinimum(int(round(smin)))
@@ -214,6 +209,14 @@ class VolumeSegmenter(SliceBrowser):
         self._export_button.released.connect(self._export_surface)
         self._export_button.setEnabled(False)
         hbox.addWidget(self._export_button)
+
+        hbox.addWidget(make_label('    '))  # small break
+        hbox.addWidget(make_label('Max # Voxels'))
+        self._max_n_voxels_spin_box = QSpinBox()
+        self._max_n_voxels_spin_box.setRange(0, 10000)
+        self._max_n_voxels_spin_box.setValue(200)
+        self._max_n_voxels_spin_box.setSingleStep(10)
+        hbox.addWidget(self._max_n_voxels_spin_box)
 
         hbox.addStretch(1)
 
@@ -335,13 +338,15 @@ class VolumeSegmenter(SliceBrowser):
             self._vol_img[voxel] = 1
         self._update_vol_images(draw=True)
         self._plot_3d(render=True)
+        self.setFocus()
 
     def _mark(self):
         """Mark the volume with the current tolerance and location."""
         self._undo_button.setEnabled(True)
         self._export_button.setEnabled(True)
         voxels = _voxel_neighbors(
-            self._vox, self._base_data, self._tol_slider.value() / 100
+            self._vox, self._base_data, self._tol_slider.value() / 100,
+            self._max_n_voxels_spin_box.value()
         )
         if self._vol_coords:
             voxels = voxels.union(self._vol_coords[-1])
@@ -350,6 +355,7 @@ class VolumeSegmenter(SliceBrowser):
             self._vol_img[voxel] = 1
         self._update_vol_images(draw=True)
         self._plot_3d(render=True)
+        self.setFocus()
 
     def _update_vol_images(self, axis=None, draw=False):
         """Update the volume image(s)."""

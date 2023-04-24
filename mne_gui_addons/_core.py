@@ -137,6 +137,12 @@ def _make_mpl_plot(
     return canvas, fig
 
 
+def make_label(name):
+    label = QLabel(name)
+    label.setAlignment(QtCore.Qt.AlignCenter)
+    return label
+
+
 class SliceBrowser(QMainWindow):
     """Navigate between slices of an MRI, CT, etc. image."""
 
