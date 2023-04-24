@@ -38,6 +38,12 @@ from qtpy.QtWidgets import (
 
 from matplotlib.pyplot import Figure, imread
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.transforms import Affine2D
+
+from pyvista import vtk_points
+from vtkmodules.vtkCommonMath import vtkMatrix4x4
+from vtkmodules.vtkCommonTransforms import vtkTransform
+from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
 
 from ._core import SliceBrowser, make_label
 from mne.channels import make_dig_montage
@@ -53,11 +59,6 @@ from mne.transforms import (
 )
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
-
-from pyvista import vtk_points
-from vtkmodules.vtkCommonMath import vtkMatrix4x4
-from vtkmodules.vtkCommonTransforms import vtkTransform
-from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
 
 _CH_PLOT_SIZE = 1024
 _RADIUS_SCALAR = 0.4
@@ -337,7 +338,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout.addStretch(1)
 
         surgical_image_hbox = QHBoxLayout()
-        self._surgical_image_button = QPushButton("Add Surgical Image")
+        self._surgical_image_button = QPushButton("Add\nSurgical\nImage")
         self._surgical_image_button.released.connect(self._toggle_surgical_image)
         surgical_image_hbox.addWidget(self._surgical_image_button)
         surgical_image_hbox.addStretch(1)
@@ -383,6 +384,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
         )
         surgical_image_yscale_hbox.addWidget(self._surgical_image_yscale_slider)
         surgical_image_sliders_vbox.addLayout(surgical_image_yscale_hbox)
+
+        surgical_image_rotation_hbox = QHBoxLayout()
+        surgical_image_rotation_hbox.addWidget(make_label("Rotation"))
+        self._surgical_image_rotation_slider = self._make_slider(
+            0, 90, 45, self._update_surgical_image_rotation
+        )
+        surgical_image_rotation_hbox.addWidget(self._surgical_image_rotation_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_rotation_hbox)
 
         surgical_image_hbox.addLayout(surgical_image_sliders_vbox)
 
@@ -527,6 +536,20 @@ class IntracranialElectrodeLocator(SliceBrowser):
         height = self._surgical_image_height_slider.value() / 100
         size = self._surgical_image_chart.size
         self._surgical_image_chart.size = (size[0], height * yscale)
+        self._renderer._update()
+
+    def _update_surgical_image_rotation(self):
+        """Update the rotation of the surgical image."""
+        size = self._surgical_image.get_size()
+        rot = Affine2D().rotate_deg_around(
+            size[0] // 2,
+            size[1] // 2,
+            self._surgical_image_rotation_slider.value() - 45,
+        )
+        self._surgical_image.set_transform(
+            rot + self._surgical_image_chart._fig.axes[0].transData
+        )
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _add_surface(self):
