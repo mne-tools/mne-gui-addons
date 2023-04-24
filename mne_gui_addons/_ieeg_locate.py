@@ -341,7 +341,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image_button = QPushButton("Add\nSurgical\nImage")
         self._surgical_image_button.released.connect(self._toggle_surgical_image)
         surgical_image_hbox.addWidget(self._surgical_image_button)
-        surgical_image_hbox.addStretch(1)
 
         surgical_image_sliders_vbox = QVBoxLayout()
 
@@ -353,26 +352,26 @@ class IntracranialElectrodeLocator(SliceBrowser):
         surgical_image_alpha_hbox.addWidget(self._surgical_image_alpha_slider)
         surgical_image_sliders_vbox.addLayout(surgical_image_alpha_hbox)
 
-        surgical_image_width_hbox = QHBoxLayout()
-        surgical_image_width_hbox.addWidget(make_label("Width"))
-        self._surgical_image_width_slider = self._make_slider(
-            0, 100, 100, self._update_surgical_image_width
+        surgical_image_xoffset_hbox = QHBoxLayout()
+        surgical_image_xoffset_hbox.addWidget(make_label("X Offset"))
+        self._surgical_image_xoffset_slider = self._make_slider(
+            0, 100, 10, self._update_surgical_image_xoffset
         )
-        surgical_image_width_hbox.addWidget(self._surgical_image_width_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_width_hbox)
+        surgical_image_xoffset_hbox.addWidget(self._surgical_image_xoffset_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_xoffset_hbox)
 
-        surgical_image_height_hbox = QHBoxLayout()
-        surgical_image_height_hbox.addWidget(make_label("Height"))
-        self._surgical_image_height_slider = self._make_slider(
-            0, 100, 100, self._update_surgical_image_height
+        surgical_image_yoffset_hbox = QHBoxLayout()
+        surgical_image_yoffset_hbox.addWidget(make_label("Y Offset"))
+        self._surgical_image_yoffset_slider = self._make_slider(
+            0, 100, 10, self._update_surgical_image_yoffset
         )
-        surgical_image_height_hbox.addWidget(self._surgical_image_height_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_height_hbox)
+        surgical_image_yoffset_hbox.addWidget(self._surgical_image_yoffset_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_yoffset_hbox)
 
         surgical_image_xscale_hbox = QHBoxLayout()
         surgical_image_xscale_hbox.addWidget(make_label("X Scale"))
         self._surgical_image_xscale_slider = self._make_slider(
-            0, 100, 100, self._update_surgical_image_xscale
+            0, 100, 80, self._update_surgical_image_xscale
         )
         surgical_image_xscale_hbox.addWidget(self._surgical_image_xscale_slider)
         surgical_image_sliders_vbox.addLayout(surgical_image_xscale_hbox)
@@ -380,7 +379,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         surgical_image_yscale_hbox = QHBoxLayout()
         surgical_image_yscale_hbox.addWidget(make_label("Y Scale"))
         self._surgical_image_yscale_slider = self._make_slider(
-            0, 100, 100, self._update_surgical_image_yscale
+            0, 100, 80, self._update_surgical_image_yscale
         )
         surgical_image_yscale_hbox.addWidget(self._surgical_image_yscale_slider)
         surgical_image_sliders_vbox.addLayout(surgical_image_yscale_hbox)
@@ -486,15 +485,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ax = fig.add_axes([0, 0, 1, 1])
             ax.axis("off")
             self._surgical_image = ax.imshow(im_data, aspect="auto", alpha=0.4)
-            self._surgical_image_chart = ChartMPL(fig, size=(1, 1), loc=(0, 0))
+            self._surgical_image_chart = ChartMPL(fig, size=(0.8, 0.8), loc=(0.1, 0.1))
             self._renderer.plotter.add_chart(self._surgical_image_chart)
+            self._surgical_image_button.setText("Hide\nSurgical\nImage")
         else:
-            if self._surgical_image_button.text() == "Show Surgical Image":
+            if self._surgical_image_button.text() == "Show\nSurgical\nImage":
                 self._surgical_image_chart.visible = True
-                self._surgical_image_button.setText("Hide Surgical Image")
+                self._surgical_image_button.setText("Hide\nSurgical\nImage")
             else:
                 self._surgical_image_chart.visible = False
-                self._surgical_image_button.setText("Show Surgical Image")
+                self._surgical_image_button.setText("Show\nSurgical\nImage")
         self._renderer._update()
 
     def _update_surgical_image_alpha(self):
@@ -504,38 +504,36 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image_chart._redraw()
         self._renderer._update()
 
-    def _update_surgical_image_width(self):
-        """Update the width of the surgical image."""
-        width = self._surgical_image_width_slider.value() / 100
+    def _update_surgical_image_xoffset(self):
+        """Update the x offset of the surgical image."""
+        xoffset = self._surgical_image_xoffset_slider.value() / 100
         loc = self._surgical_image_chart.loc
-        size = self._surgical_image_chart.size
-        self._surgical_image_chart.loc = ((1 - width) / 2, loc[1])
-        self._surgical_image_chart.size = (width, size[1])
+        self._surgical_image_chart.loc = (xoffset, loc[1])
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
-    def _update_surgical_image_height(self):
-        """Update the height of the surgical image."""
-        height = self._surgical_image_height_slider.value() / 100
+    def _update_surgical_image_yoffset(self):
+        """Update the y offset of the surgical image."""
+        yoffset = self._surgical_image_yoffset_slider.value() / 100
         loc = self._surgical_image_chart.loc
-        size = self._surgical_image_chart.size
-        self._surgical_image_chart.loc = (loc[0], (1 - height) / 2)
-        self._surgical_image_chart.size = (size[0], height)
+        self._surgical_image_chart.loc = (loc[0], yoffset)
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _update_surgical_image_xscale(self):
         """Update the x scale of the surgical image."""
         xscale = self._surgical_image_xscale_slider.value() / 100
-        width = self._surgical_image_width_slider.value() / 100
         size = self._surgical_image_chart.size
-        self._surgical_image_chart.size = (width * xscale, size[1])
+        self._surgical_image_chart.size = (xscale, size[1])
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _update_surgical_image_yscale(self):
         """Update the y scale of the surgical image."""
         yscale = self._surgical_image_yscale_slider.value() / 100
-        height = self._surgical_image_height_slider.value() / 100
         size = self._surgical_image_chart.size
-        self._surgical_image_chart.size = (size[0], height * yscale)
+        self._surgical_image_chart.size = (size[0], yscale)
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _update_surgical_image_rotation(self):
