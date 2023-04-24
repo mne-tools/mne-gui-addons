@@ -5,6 +5,7 @@
 #
 # License: BSD (3-clause)
 
+import os.path as op
 import numpy as np
 import platform
 from functools import partial
@@ -34,17 +35,20 @@ from qtpy.QtWidgets import (
     QGraphicsScene,
 )
 
+from matplotlib.pyplot import Figure, imread
 from matplotlib.colors import LinearSegmentedColormap
 
-from ._core import SliceBrowser, make_label
+from ._core import SliceBrowser, make_label, _load_image
 from mne.channels import make_dig_montage
-from mne.surface import _voxel_neighbors
+from mne.surface import _voxel_neighbors, read_surface, _marching_cubes
 from mne.transforms import (
     apply_trans,
     _get_trans,
     invert_transform,
     translation,
     rotation3d,
+    _sph_to_cart,
+    _cart_to_sph,
 )
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
@@ -135,6 +139,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._grid_radius = None
         self._grid_actors = None
         self._grid_meshes = None
+        self._skull_actor = self._skull_mesh = None
+        self._surgical_image_chart = None
+        self._vasculature_actor = None
 
         # load data, apply trans
         self._head_mri_t = _get_trans(trans, "head", "mri")[0]
@@ -286,12 +293,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         move_grid_layout = QVBoxLayout()
 
-        step_size_layout = QHBoxLayout()
-        step_size_layout.addWidget(make_label("Step Size"))
-        self._step_size_slider = self._make_slider(1, 200, 100)
-        step_size_layout.addWidget(self._step_size_slider)
-        move_grid_layout.addLayout(step_size_layout)
-
         buttons = dict()
         for trans_type in ("translation", "rotation"):
             move_grid_layout.addWidget(make_label(trans_type.capitalize()))
@@ -321,6 +322,86 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 move_grid_layout.addLayout(direction_layout)
             move_grid_layout.addStretch(1)
 
+        step_size_layout = QHBoxLayout()
+        step_size_layout.addWidget(make_label("Step Size"))
+        self._step_size_slider = self._make_slider(1, 200, 100)
+        step_size_layout.addWidget(self._step_size_slider)
+        move_grid_layout.addLayout(step_size_layout)
+
+        move_grid_layout.addStretch(1)
+
+        surgical_image_hbox = QHBoxLayout()
+        self._surgical_image_button = QPushButton("Add Surgical Image")
+        self._surgical_image_button.released.connect(self._toggle_surgical_image)
+        surgical_image_hbox.addWidget(self._surgical_image_button)
+        surgical_image_hbox.addStretch(1)
+
+        surgical_image_sliders_vbox = QVBoxLayout()
+
+        surgical_image_alpha_hbox = QHBoxLayout()
+        surgical_image_alpha_hbox.addWidget(make_label("Alpha"))
+        self._surgical_image_alpha_slider = self._make_slider(
+            0, 100, 40, self._update_surgical_image_alpha
+        )
+        surgical_image_alpha_hbox.addWidget(self._surgical_image_alpha_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_alpha_hbox)
+
+        surgical_image_width_hbox = QHBoxLayout()
+        surgical_image_width_hbox.addWidget(make_label("Width"))
+        self._surgical_image_width_slider = self._make_slider(
+            0, 100, 100, self._update_surgical_image_width
+        )
+        surgical_image_width_hbox.addWidget(self._surgical_image_width_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_width_hbox)
+
+        surgical_image_height_hbox = QHBoxLayout()
+        surgical_image_height_hbox.addWidget(make_label("Height"))
+        self._surgical_image_height_slider = self._make_slider(
+            0, 100, 100, self._update_surgical_image_height
+        )
+        surgical_image_height_hbox.addWidget(self._surgical_image_height_slider)
+        surgical_image_sliders_vbox.addLayout(surgical_image_height_hbox)
+
+        surgical_image_hbox.addLayout(surgical_image_sliders_vbox)
+
+        move_grid_layout.addLayout(surgical_image_hbox)
+        move_grid_layout.addStretch(1)
+
+        vasculature_hbox = QHBoxLayout()
+        self._vasculature_button = QPushButton("Add Vasculature")
+        self._vasculature_button.released.connect(self._add_remove_vasculature)
+        vasculature_hbox.addWidget(self._vasculature_button)
+        self._toggle_vasculature_button = QPushButton("Hide Vasculature")
+        self._toggle_vasculature_button.setEnabled(False)
+        self._toggle_vasculature_button.released.connect(self._toggle_vasculature)
+        vasculature_hbox.addWidget(self._toggle_vasculature_button)
+
+        move_grid_layout.addLayout(vasculature_hbox)
+        move_grid_layout.addStretch(1)
+
+        skull_layout = QHBoxLayout()
+
+        self._skull_button = QPushButton("Show Skull")
+        self._skull_button.released.connect(self._toggle_skull)
+        skull_layout.addWidget(self._skull_button)
+        skull_layout.addStretch(1)
+        skull_layout.addWidget(make_label("Shrink"))
+        self._skull_spin_box = QDoubleSpinBox()
+        self._skull_spin_box.setRange(0, 1)
+        self._skull_spin_box.setSingleStep(0.01)
+        self._skull_spin_box.setValue(1)
+        self._skull_spin_box.valueChanged.connect(self._shrink_skull)
+        skull_layout.addWidget(self._skull_spin_box)
+
+        move_grid_layout.addLayout(skull_layout)
+        move_grid_layout.addStretch(1)
+
+        surf_hbox = QHBoxLayout()
+        self._surf_add_button = QPushButton("Add Surface (e.g. Tumor)")
+        self._surf_add_button.released.connect(self._add_surface)
+        self._surf_
+
+        move_grid_layout.addLayout(surf_hbox)
         move_grid_layout.addStretch(1)
 
         alpha_layout = QHBoxLayout()
@@ -367,6 +448,186 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_layout.addWidget(self._move_grid_widget)
         return grid_layout
 
+    def _toggle_surgical_image(self):
+        """Toggle showing a surgical image overlaid on the 3D viewer."""
+        if self._surgical_image_chart is None:
+            from pyvista import ChartMPL
+
+            fname, _ = QFileDialog.getOpenFileName(
+                self, caption="Surgical Image", filter="(*.png *.jpg *.jpeg)"
+            )
+            if not fname:
+                return
+            im_data = imread(fname)
+            fig = Figure()
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.axis("off")
+            ax.imshow(im_data, aspect="auto")
+            self._surgical_image_chart = ChartMPL(fig, size=(1, 1), loc=(0, 0))
+            self._surgical_image_chart.background_color = (1.0, 1.0, 1.0, 0.4)
+
+        else:
+            if self._surgical_image_button.text() == "Show Surgical Image":
+                self._surgical_image_chart.visible = True
+                self._surgical_image_button.setText("Hide Surgical Image")
+            else:
+                self._surgical_image_chart.visible = False
+                self._surgical_image_button.setText("Show Surgical Image")
+            self._renderer._update()
+
+    def _update_surgical_image_alpha(self):
+        """Update the opacity of the surgical image."""
+        alpha = self._surgical_image_alpha_slider.value() / 100
+        self._surgical_image_chart.background_color = (1.0, 1.0, 1.0, alpha)
+        self._renderer._update()
+
+    def _update_surgical_image_width(self):
+        """Update the width of the surgical image."""
+        width = self._surgical_image_width_slider.value() / 100
+        loc = self._surgical_image_chart.loc
+        self._surgical_image_chart.loc = (width / 2, loc[1], 1 - width / 2, loc[3])
+        self._renderer._update()
+
+    def _update_surgical_image_height(self):
+        """Update the width of the surgical image."""
+        height = self._surgical_image_height_slider.value() / 100
+        loc = self._surgical_image_chart.loc
+        self._surgical_image_chart.loc = (loc[0], height / 2, loc[2], 1 - height / 2)
+        self._renderer._update()
+
+    def _add_remove_vasculature(self):
+        """Add vasculature from a registered angiogram or contrast image."""
+        if self._vasculature_actor is None:  # load image
+            fname, _ = QFileDialog.getOpenFileName(
+                self,
+                caption="Volume with Vasculature",
+                filter="(*.nii *.nii.gz *.mgz)",
+            )
+            if not fname:
+                return
+            value, _ = QInputDialog.getDouble(
+                self,
+                "Intensity",
+                "Intensity of the vasculature in the image (use freeview to check)?",
+            )
+            tol, _ = QInputDialog.getDouble(
+                self,
+                "Tolerance",
+                "Tolerance around that value to include (use freeview to check)?",
+            )
+            img_data, vox_ras_t, vox_scan_ras_t = _load_image(fname)
+            skull_mask, _, _ = _load_image(op.join(self._subject_dir, 'mri'))
+            if not np.allclose(vox_scan_ras_t, self._vox_scan_ras_t):
+                QMessageBox.information(
+                    self,
+                    "Vasculature Volume Not Aligned",
+                    f"Found {vox_scan_ras_t} affine, expected {self._vox_scan_ras_t}",
+                )
+                return
+            rr, tris = _marching_cubes(
+                np.logical_and(img_data >= value - tol, img_data <= value + tol), [1]
+            )[0]
+            rr = apply_trans(self._vox_ras_t, rr[:, ::-1])
+            self._vasculature_actor, _ = self._renderer.mesh(
+                *rr.T,
+                tris,
+                color="red",
+                opacity=1,
+                reset_camera=False,
+            )
+            self._toggle_vasculature_button.setEnabled(True)
+        else:
+            self._renderer.plotter.remove_actor(self._vasculature_actor)
+            self._toggle_vasculature_button.setEnabled(False)
+            self._vasculature_actor = None
+
+    def _toggle_vasculature(self):
+        """Toggle whether the vasculature is shown or hidden."""
+        if self._vasculature_button.text() == "Show Vasculature":
+            self._vasculature_actor.setVisible(True)
+            self._vasculature_button.setText("Hide Vasculature")
+        else:
+            self._vasculature_actor.setVisible(False)
+            self._vasculature_button.setText("Show Vasculature")
+
+    def _add_surface(self):
+        """Add a surface, like a tumor for visualization and collisions."""
+        fname, _ = QFileDialog.getOpenFileName(
+            self, caption="Surface", filter="(* *.surf)"
+        )
+        if not fname:
+            return
+        color, _ = QInputDialog.getText(self, "Surface Color", "Color?")
+        rr, tris = read_surface(fname)
+        self._surf_actors.append(self._renderer.mesh(
+            *rr.T,
+            tris,
+            color=color,
+            opacity=1,
+            reset_camera=False,
+        )[0])
+
+    def _toggle_surface(self):
+        """Toggle whether the surface is showing."""
+        if self._vasculature_button.text() == "Show Vasculature":
+            self._vasculature_actor.setVisible(True)
+            self._vasculature_button.setText("Hide Vasculature")
+        else:
+            self._vasculature_actor.setVisible(False)
+            self._vasculature_button.setText("Show Vasculature")
+
+    def _check_skull(self):
+        """Check that the skull surface has been computed."""
+        skull_fname = op.join(self._subject_dir, "bem", "inner_skull.surf")
+        if not op.isfile(skull_fname):
+            QMessageBox.information(
+                self,
+                "BEM not computed",
+                "Skull surface not found, use 'mne.bem.make_watershed_bem' or "
+                "'mne.bem.make_flash_bem' (if you have a flash image)",
+            )
+            return
+        return skull_fname
+
+    def _show_skull(self):
+        """Render the 3D skull."""
+        rr, tris = read_surface(op.join(self._subject_dir, "bem", "inner_skull.surf"))
+        rr = _cart_to_sph(rr)
+        rr[:, 0] *= self._skull_spin_box.value()
+        rr = _sph_to_cart(rr)
+        self._skull_actor, self._skull_mesh = self._renderer.mesh(
+            *rr.T,
+            tris,
+            color="gray",
+            opacity=0.2,
+            reset_camera=False,
+        )
+
+    def _toggle_skull(self):
+        """Toggle whether the skull is showing and colliding with the grid."""
+        skull_fname = self._check_skull()
+        if skull_fname is None:
+            return
+        if self._skull_actor is None:  # initialize
+            self._show_skull()
+            self._skull_button.setText("Hide Skull")
+        else:
+            if self._skull_button.text() == "Show Skull":
+                self._skull_actor.visibility = True
+                self._skull_button.setText("Hide Skull")
+            else:
+                self._skull_actor.visibility = False
+                self._skull_button.setText("Show Skull")
+
+    def _shrink_skull(self):
+        """Shrink the skull for localizing to the pial surface."""
+        skull_fname = self._check_skull()
+        if skull_fname is None:
+            return
+        if self._skull_actor is not None:
+            self._renderer.plotter.remove_actor(self._skull_actor, render=False)
+        self._show_skull()
+
     def _toggle_add_grid(self):
         """Toggle whether the add grid menu is collapsed."""
         self._show_grid_view.setVisible(not self._show_grid_view.isVisible())
@@ -390,8 +651,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos = np.array(
             [
                 (0, i, j)
-                for i in np.arange(0, nx * pitch, pitch)
-                for j in np.arange(0, ny * pitch, pitch)
+                for j in np.arange(0, nx * pitch, pitch)
+                for i in np.arange(0, ny * pitch, pitch)
             ]
         )
         grid_pos -= grid_pos.mean(axis=0)
@@ -402,7 +663,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _import_grid(self):
         """Import grid positions from a tsv file."""
-        fname = QFileDialog.getOpenFileName(
+        fname, _ = QFileDialog.getOpenFileName(
             self, caption="Grid", filter="(*.csv *.tsv)"
         )
         if not fname:
@@ -414,7 +675,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos -= grid_pos.mean(axis=0)
         grid_pos += self._ras
         self._grid_pos = [grid_pos]
-        self._grid_radius = QInputDialog.getDouble(self, "Grid Radius", "radius (mm)")
+        self._grid_radius, _ = QInputDialog.getDouble(
+            self, "Grid Radius", "radius (mm)"
+        )
         self._show_grid()
 
     def _show_grid(self, selected=False):
@@ -440,9 +703,17 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Translate or rotate the grid."""
         pos = self._grid_pos[-1]
         center = pos.mean(axis=0)
-        xyz = np.array(
-            [step * (direction == this_direction) for this_direction in ("x", "y", "z")]
-        ) * self._step_size_slider.value() / 100
+        xyz = (
+            np.array(
+                [
+                    step * (direction == this_direction)
+                    for this_direction in ("x", "y", "z")
+                ]
+            )
+            * self._step_size_slider.value()
+            / 100
+        )
+        collide_skull = self._skull_mesh is not None and self._skull_actor.visibility
         if trans_type == "translation":
             pos2 = pos + translation(*xyz)[:3, 3]
         else:
@@ -451,6 +722,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             pos2 = np.dot(rot, (pos - center).T).T + center
         for mesh, trans in zip(self._grid_meshes, pos2 - pos):
             mesh.translate(trans, inplace=True)
+            if collide_skull and mesh.collision(self._skull_mesh)[1]:
+                mesh.translate(-trans, inplace=True)
         self._grid_pos.append(pos2)
         self._undo_button.setEnabled(True)
         self._renderer._update()
@@ -881,7 +1154,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _next_grid(self):
         """Increment the grid selection index."""
-        self._grid_ch_index = (self._grid_ch_index + 1) % len(self._grid_pos[-1].shape[0])
+        self._grid_ch_index = (self._grid_ch_index + 1) % len(
+            self._grid_pos[-1].shape[0]
+        )
         self._update_grid_selection()
 
     def _color_list_item(self, name=None):
