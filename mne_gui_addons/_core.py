@@ -574,6 +574,7 @@ class SliceBrowser(QMainWindow):
         logger.debug(f"Setting RAS: ({msg}) mm")
         if update_plots:
             self._move_cursors_to_pos()
+        self.setFocus()  # focus back to main
 
     def set_vox(self, vox):
         """Set the crosshairs to a given voxel coordinate.

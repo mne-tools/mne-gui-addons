@@ -5,11 +5,12 @@
 #
 # License: BSD (3-clause)
 
+import os.path as op
 import numpy as np
 from mne.surface import _marching_cubes, write_surface
 from mne.transforms import apply_trans
 
-from ._core import SliceBrowser, _CMAP, _N_COLORS, make_label
+from ._core import SliceBrowser, _CMAP, _N_COLORS, make_label, _load_image
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (
@@ -19,6 +20,7 @@ from qtpy.QtWidgets import (
     QSlider,
     QPushButton,
     QFileDialog,
+    QMessageBox,
     QSpinBox,
 )
 
@@ -197,6 +199,10 @@ class VolumeSegmenter(SliceBrowser):
         mark_button.released.connect(self._mark)
         button_vbox.addWidget(mark_button)
 
+        mark_all_button = QPushButton("Mark All")
+        mark_all_button.released.connect(self._mark_all)
+        button_vbox.addWidget(mark_all_button)
+
         slider_hbox.addLayout(button_vbox)
 
         return slider_hbox
@@ -210,7 +216,7 @@ class VolumeSegmenter(SliceBrowser):
         self._export_button.setEnabled(False)
         hbox.addWidget(self._export_button)
 
-        hbox.addWidget(make_label("    "))  # small break
+        hbox.addWidget(make_label("\t"))  # small break
         hbox.addWidget(make_label("Max # Voxels"))
         self._max_n_voxels_spin_box = QSpinBox()
         self._max_n_voxels_spin_box.setRange(0, 10000)
@@ -218,10 +224,49 @@ class VolumeSegmenter(SliceBrowser):
         self._max_n_voxels_spin_box.setSingleStep(10)
         hbox.addWidget(self._max_n_voxels_spin_box)
 
+        hbox.addWidget(make_label("\t"))  # small break
+        brainmask_button = QPushButton("Add Brainmask")
+        brainmask_button.released.connect(self._apply_brainmask)
+        hbox.addWidget(brainmask_button)
+
         hbox.addStretch(1)
 
         super()._configure_status_bar(hbox=hbox)
         return hbox
+
+    def _apply_brainmask(self):
+        """Mask the volume using the brainmask"""
+        if self._subject_dir is None or not op.isfile(
+            op.join(self._subject_dir, "mri", "brainmask.mgz")
+        ):
+            QMessageBox.information(
+                self,
+                "Recon-all Not Computed",
+                "The brainmask was not found, please pass the 'subject' "
+                "and 'subjects_dir' arguments for a completed recon-all",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "Applying Brainmask",
+            "Applying the brainmask, this will take ~30 seconds",
+        )
+        img_data, _, vox_scan_ras_t, _ = _load_image(
+            op.join(self._subject_dir, "mri", "brainmask.mgz"))
+        idxs = np.meshgrid(np.arange(self._base_data.shape[0]),
+                           np.arange(self._base_data.shape[1]),
+                           np.arange(self._base_data.shape[2]),
+                           indexing='ij')
+        idxs = np.array(idxs)  # (3, *image_data.shape)
+        idxs = np.transpose(idxs, [1, 2, 3, 0])  # (*image_data.shape, 3)
+        idxs = idxs.reshape(-1, 3)  # (n_voxels, 3)
+        idxs = apply_trans(self._vox_scan_ras_t, idxs)  # vox -> scanner RAS
+        idxs = apply_trans(np.linalg.inv(vox_scan_ras_t), idxs)  # scanner RAS -> mri vox
+        idxs = idxs.round().astype(int)  # round to nearest voxel
+        brain = set([(x, y, z) for x, y, z in np.array(np.where(img_data > 0)).T])
+        mask = np.array([tuple(idx) not in brain for idx in idxs])
+        self._base_data[mask.reshape(self._base_data.shape)] = 0
+        self._update_images()
 
     def _update_brain_alpha(self):
         """Change the alpha level of the brain."""
@@ -349,6 +394,29 @@ class VolumeSegmenter(SliceBrowser):
             self._base_data,
             self._tol_slider.value() / 100,
             self._max_n_voxels_spin_box.value(),
+        )
+        if self._vol_coords:
+            voxels = voxels.union(self._vol_coords[-1])
+        self._vol_coords.append(voxels)
+        for voxel in voxels:
+            self._vol_img[voxel] = 1
+        self._update_vol_images(draw=True)
+        self._plot_3d(render=True)
+        self.setFocus()
+
+    def _mark_all(self):
+        """Mark the volume globally with the current tolerance and location."""
+        self._undo_button.setEnabled(True)
+        self._export_button.setEnabled(True)
+        val = self._base_data[tuple(self._vox.round().astype(int))]
+        tol = self._tol_slider.value() / 100
+        voxels = set(
+            [
+                (x, y, z)
+                for x, y, z in np.array(
+                    np.where(abs(self._base_data - val) / val <= tol)
+                ).T
+            ]
         )
         if self._vol_coords:
             voxels = voxels.union(self._vol_coords[-1])
