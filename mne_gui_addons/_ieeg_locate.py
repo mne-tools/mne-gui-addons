@@ -131,6 +131,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         # store info for modification
         self._info = info
         self._seeg_idx = pick_types(self._info, meg=False, seeg=True)
+        self._ecog_idx = pick_types(self._info, meg=False, ecog=True)
         self._verbose = verbose
 
         # channel plotting default parameters
@@ -675,6 +676,27 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _toggle_add_grid(self):
         """Toggle whether the add grid menu is collapsed."""
         self._show_grid_view.setVisible(not self._show_grid_view.isVisible())
+        if self._ecog_idx.size > 0 and not all(
+            [np.isnan(self._chs[self._ch_names[idx]]).any() for idx in self._ecog_idx]
+        ):
+            self._grid_pos = [
+                np.array(
+                    [
+                        self._chs[self._ch_names[idx]]
+                        for idx in self._ecog_idx
+                        if not np.isnan(self._chs[self._ch_names[idx]]).any()
+                    ]
+                )
+            ]
+            self._grid_tris = Delaunay(self._grid_pos[-1][:, 1:]).simplices
+            self._grid_radius, _ = QInputDialog.getDouble(
+                self, "Grid Radius", "radius (mm)"
+            )
+            for name in self._3d_chs.copy():
+                self._renderer.plotter.remove_actor(
+                    self._3d_chs.pop(name), render=False
+                )
+            self._show_grid()
         if self._grid_pos is None:
             self._add_grid_widget.setVisible(not self._add_grid_widget.isVisible())
         else:
