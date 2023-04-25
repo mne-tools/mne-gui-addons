@@ -496,7 +496,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._renderer.plotter.camera.focal_point,
                 self._renderer.plotter.camera.azimuth,
                 self._renderer.plotter.camera.elevation,
-                self._renderer.plotter.camera.roll
+                self._renderer.plotter.camera.roll,
             )
             self._save_view_button.setText("Go To\nView")
         else:
