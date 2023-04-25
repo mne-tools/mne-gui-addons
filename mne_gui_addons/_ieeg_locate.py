@@ -154,6 +154,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image_chart = None
         self._surgical_image = None
         self._surgical_image_view = None
+        self._surgical_image_rotation = 0
         self._surf_actors = list()
 
         # load data, apply trans
@@ -307,8 +308,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout = QVBoxLayout()
 
         buttons = dict()
-        for trans_type in ("translation", "rotation"):
-            move_grid_layout.addWidget(make_label(trans_type.capitalize()))
+        for trans_type in ("trans", "rotation"):
             for direction in ("x", "y", "z"):
                 direction_layout = QHBoxLayout()
                 buttons[("left", trans_type, direction)] = QPushButton("<")
@@ -330,37 +330,26 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     )
                 )
                 direction_layout.addWidget(buttons[("left", trans_type, direction)])
-                direction_layout.addWidget(make_label(direction))
+                direction_layout.addWidget(make_label(f"{direction} {trans_type}"))
                 direction_layout.addWidget(buttons[("right", trans_type, direction)])
                 move_grid_layout.addLayout(direction_layout)
-            move_grid_layout.addStretch(1)
 
-        step_size_layout = QHBoxLayout()
-        step_size_layout.addWidget(make_label("Step Size"))
-        self._step_size_slider = self._make_slider(1, 200, 100)
-        step_size_layout.addWidget(self._step_size_slider)
-        move_grid_layout.addLayout(step_size_layout)
-
-        move_grid_layout.addStretch(1)
+        move_grid_layout.addWidget(make_label("\t"))  # spacing
 
         surgical_image_hbox = QHBoxLayout()
-
-        surgical_image_vbox = QVBoxLayout()
-        self._surgical_image_button = QPushButton("Add\nSurgical\nImage")
+        self._surgical_image_button = QPushButton("Add Surgical\nImage")
         self._surgical_image_button.released.connect(self._toggle_surgical_image)
-        surgical_image_vbox.addWidget(self._surgical_image_button)
+        surgical_image_hbox.addWidget(self._surgical_image_button)
 
         self._save_view_button = QPushButton("Save\nView")
         self._save_view_button.released.connect(self._save_view_surgical_image)
-        surgical_image_vbox.addWidget(self._save_view_button)
+        surgical_image_hbox.addWidget(self._save_view_button)
 
         remove_view_button = QPushButton("Remove\nView")
         remove_view_button.released.connect(self._remove_surgical_image_view)
-        surgical_image_vbox.addWidget(remove_view_button)
+        surgical_image_hbox.addWidget(remove_view_button)
 
-        surgical_image_hbox.addLayout(surgical_image_vbox)
-
-        surgical_image_sliders_vbox = QVBoxLayout()
+        move_grid_layout.addLayout(surgical_image_hbox)
 
         surgical_image_alpha_hbox = QHBoxLayout()
         surgical_image_alpha_hbox.addWidget(make_label("Alpha"))
@@ -368,52 +357,51 @@ class IntracranialElectrodeLocator(SliceBrowser):
             0, 100, 40, self._update_surgical_image_alpha
         )
         surgical_image_alpha_hbox.addWidget(self._surgical_image_alpha_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_alpha_hbox)
+        move_grid_layout.addLayout(surgical_image_alpha_hbox)
 
-        surgical_image_xoffset_hbox = QHBoxLayout()
-        surgical_image_xoffset_hbox.addWidget(make_label("X Offset"))
-        self._surgical_image_xoffset_slider = self._make_slider(
-            0, 100, 10, self._update_surgical_image_xoffset
-        )
-        surgical_image_xoffset_hbox.addWidget(self._surgical_image_xoffset_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_xoffset_hbox)
+        for trans_type in ("offset", "scale", "rotation"):
+            for direction in ("x", "y"):
+                if trans_type == "rotation":
+                    if direction == "y":
+                        continue
+                    else:
+                        direction = ""
+                direction_layout = QHBoxLayout()
+                buttons[("left", trans_type, direction)] = QPushButton("<")
+                buttons[("right", trans_type, direction)] = QPushButton(">")
+                buttons[("left", trans_type, direction)].released.connect(
+                    partial(
+                        self._move_surgical_image,
+                        step=-1,
+                        trans_type=trans_type,
+                        direction=direction,
+                    )
+                )
+                buttons[("right", trans_type, direction)].released.connect(
+                    partial(
+                        self._move_surgical_image,
+                        step=1,
+                        trans_type=trans_type,
+                        direction=direction,
+                    )
+                )
+                direction_layout.addWidget(buttons[("left", trans_type, direction)])
+                direction_layout.addWidget(
+                    make_label(f"{direction} {trans_type}".strip())
+                )
+                direction_layout.addWidget(buttons[("right", trans_type, direction)])
+                move_grid_layout.addLayout(direction_layout)
 
-        surgical_image_yoffset_hbox = QHBoxLayout()
-        surgical_image_yoffset_hbox.addWidget(make_label("Y Offset"))
-        self._surgical_image_yoffset_slider = self._make_slider(
-            0, 100, 10, self._update_surgical_image_yoffset
-        )
-        surgical_image_yoffset_hbox.addWidget(self._surgical_image_yoffset_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_yoffset_hbox)
+        move_grid_layout.addWidget(make_label("\t"))  # spacer
 
-        surgical_image_xscale_hbox = QHBoxLayout()
-        surgical_image_xscale_hbox.addWidget(make_label("X Scale"))
-        self._surgical_image_xscale_slider = self._make_slider(
-            0, 100, 80, self._update_surgical_image_xscale
-        )
-        surgical_image_xscale_hbox.addWidget(self._surgical_image_xscale_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_xscale_hbox)
+        step_size_layout = QHBoxLayout()
+        step_size_layout.addWidget(make_label("Step Size"))
+        self._step_size_slider = self._make_slider(1, 500, 100)
+        step_size_layout.addWidget(self._step_size_slider)
 
-        surgical_image_yscale_hbox = QHBoxLayout()
-        surgical_image_yscale_hbox.addWidget(make_label("Y Scale"))
-        self._surgical_image_yscale_slider = self._make_slider(
-            0, 100, 80, self._update_surgical_image_yscale
-        )
-        surgical_image_yscale_hbox.addWidget(self._surgical_image_yscale_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_yscale_hbox)
-
-        surgical_image_rotation_hbox = QHBoxLayout()
-        surgical_image_rotation_hbox.addWidget(make_label("Rotation"))
-        self._surgical_image_rotation_slider = self._make_slider(
-            0, 90, 45, self._update_surgical_image_rotation
-        )
-        surgical_image_rotation_hbox.addWidget(self._surgical_image_rotation_slider)
-        surgical_image_sliders_vbox.addLayout(surgical_image_rotation_hbox)
-
-        surgical_image_hbox.addLayout(surgical_image_sliders_vbox)
-
-        move_grid_layout.addLayout(surgical_image_hbox)
+        move_grid_layout.addLayout(step_size_layout)
         move_grid_layout.addStretch(1)
+        move_grid_layout.addWidget(make_label("\t"))  # spacer
 
         skull_layout = QHBoxLayout()
 
@@ -546,50 +534,46 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
-    def _update_surgical_image_xoffset(self):
-        """Update the x offset of the surgical image."""
-        xoffset = self._surgical_image_xoffset_slider.value() / 100
-        loc = self._surgical_image_chart.loc
-        self._surgical_image_chart.loc = (xoffset, loc[1])
+    def _move_surgical_image(self, step, trans_type, direction):
+        """Move the surgical image."""
+        if self._surgical_image_chart is None:
+            QMessageBox.information(
+                self, "No Surgical Image Added", "You must add a surgical image first"
+            )
+            return
+        if trans_type == "rotation":
+            step_size = step * self._step_size_slider.value() / 100
+            self._surgical_image_rotation += step_size
+            size = self._surgical_image.get_size()
+            rot = Affine2D().rotate_deg_around(
+                size[0] // 2,
+                size[1] // 2,
+                self._surgical_image_rotation,
+            )
+            self._surgical_image.set_transform(
+                rot + self._surgical_image_chart._fig.axes[0].transData
+            )
+        else:
+            step_size = step * self._step_size_slider.value() / 10000
+            loc = self._surgical_image_chart.loc
+            size = self._surgical_image_chart.size
+            if trans_type == "offset":
+                if direction == "x":
+                    loc = (loc[0] + step_size, loc[1])
+                else:
+                    assert direction == "y"
+                    loc = (loc[0], loc[1] + step_size)
+            else:
+                assert trans_type == "scale"
+                if direction == "x":
+                    size = (size[0] + step_size, size[1])
+                else:
+                    assert direction == "y"
+                    size = (size[0], size[1] + step_size)
+            self._surgical_image_chart.loc = loc
+            self._surgical_image_chart.size = size
         self._surgical_image_chart._canvas.draw()
-        self._renderer._update()
-
-    def _update_surgical_image_yoffset(self):
-        """Update the y offset of the surgical image."""
-        yoffset = self._surgical_image_yoffset_slider.value() / 100
-        loc = self._surgical_image_chart.loc
-        self._surgical_image_chart.loc = (loc[0], yoffset)
-        self._surgical_image_chart._redraw()
-        self._renderer._update()
-
-    def _update_surgical_image_xscale(self):
-        """Update the x scale of the surgical image."""
-        xscale = self._surgical_image_xscale_slider.value() / 100
-        size = self._surgical_image_chart.size
-        self._surgical_image_chart.size = (xscale, size[1])
-        self._surgical_image_chart._canvas.draw()
-        self._renderer._update()
-
-    def _update_surgical_image_yscale(self):
-        """Update the y scale of the surgical image."""
-        yscale = self._surgical_image_yscale_slider.value() / 100
-        size = self._surgical_image_chart.size
-        self._surgical_image_chart.size = (size[0], yscale)
-        self._surgical_image_chart._canvas.draw()
-        self._renderer._update()
-
-    def _update_surgical_image_rotation(self):
-        """Update the rotation of the surgical image."""
-        size = self._surgical_image.get_size()
-        rot = Affine2D().rotate_deg_around(
-            size[0] // 2,
-            size[1] // 2,
-            self._surgical_image_rotation_slider.value() - 45,
-        )
-        self._surgical_image.set_transform(
-            rot + self._surgical_image_chart._fig.axes[0].transData
-        )
-        self._surgical_image_chart._canvas.draw()
+        self._surgical_image_chart._redraw(event=True)
         self._renderer._update()
 
     def _add_surface(self):
@@ -784,7 +768,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             / 100
         )
         collide_skull = self._skull_mesh is not None and self._skull_actor.visibility
-        if trans_type == "translation":
+        if trans_type == "trans":
             pos2 = pos + translation(*xyz)[:3, 3]
         else:
             assert trans_type == "rotation"
@@ -1197,7 +1181,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         actor, mesh = self._renderer.sphere(
             tuple(self._grid_pos[-1][self._grid_ch_index]),
             scale=self._grid_radius,
-            color="blue" if selected else "gray",
+            color="blue" if selected else "red",
             opacity=1,
         )
         self._grid_actors[self._grid_ch_index] = actor
@@ -1228,9 +1212,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _next_grid(self):
         """Increment the grid selection index."""
-        self._grid_ch_index = (self._grid_ch_index + 1) % len(
-            self._grid_pos[-1].shape[0]
-        )
         self._update_grid_selection()
 
     def _color_list_item(self, name=None):
