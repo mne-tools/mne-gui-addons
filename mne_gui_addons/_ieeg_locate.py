@@ -415,7 +415,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._skull_spin_box.setRange(0, 1)
         self._skull_spin_box.setSingleStep(0.01)
         self._skull_spin_box.setValue(1)
-        self._skull_spin_box.valueChanged.connect(self._shrink_skull)
+        self._skull_spin_box.valueChanged.connect(self._show_skull)
         skull_layout.addWidget(self._skull_spin_box)
 
         move_grid_layout.addLayout(skull_layout)
@@ -609,41 +609,23 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._toggle_surf_button.setText("Show Surface(s)")
         self._renderer._update()
 
-    def _check_skull(self):
-        """Check that the skull surface has been computed."""
-        skull_fname = op.join(self._subject_dir, "bem", "inner_skull.surf")
-        if not op.isfile(skull_fname):
-            QMessageBox.information(
-                self,
-                "BEM not computed",
-                "Skull surface not found, use 'mne.bem.make_watershed_bem' or "
-                "'mne.bem.make_flash_bem' (if you have a flash image)",
-            )
-            return
-        return skull_fname
-
-    def _show_skull(self):
+    def _show_skull(self, initialize=False):
         """Render the 3D skull."""
+        if self._skull_actor is None and not initialize:
+            return  # not shown yet
         rr, tris = read_surface(op.join(self._subject_dir, "bem", "inner_skull.surf"))
         rr, tris = decimate_surface(rr, tris, tris.shape[0] // 20)
         rr = _cart_to_sph(rr)
         rr[:, 0] *= self._skull_spin_box.value()
         rr = _sph_to_cart(rr)
-        self._skull_actor, self._skull_mesh = self._renderer.mesh(
-            *rr.T,
-            tris,
-            color="gray",
-            opacity=0.2,
-            reset_camera=False,
-        )
-
-    def _toggle_skull(self):
-        """Toggle whether the skull is showing and colliding with the grid."""
-        skull_fname = self._check_skull()
-        if skull_fname is None:
-            return
-        if self._skull_actor is None:  # initialize
-            self._show_skull()
+        if self._skull_actor is None:
+            self._skull_actor, self._skull_mesh = self._renderer.mesh(
+                *rr.T,
+                tris,
+                color="gray",
+                opacity=0.2,
+                reset_camera=False,
+            )
             for mesh in self._grid_meshes:
                 collide = vtkCollisionDetectionFilter()
                 collide.SetInputData(0, mesh)
@@ -655,23 +637,29 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 collide.SetNumberOfCellsPerNode(2)
                 collide.SetCollisionModeToFirstContact()
                 self._grid_collision_dectors.append(collide)
+        else:
+            self._skull_mesh.SetPoints(vtk_points(rr))
+
+    def _toggle_skull(self):
+        """Toggle whether the skull is showing and colliding with the grid."""
+        skull_fname = op.join(self._subject_dir, "bem", "inner_skull.surf")
+        if not op.isfile(skull_fname):
+            QMessageBox.information(
+                self,
+                "BEM not computed",
+                "Skull surface not found, use 'mne.bem.make_watershed_bem' or "
+                "'mne.bem.make_flash_bem' (if you have a flash image)",
+            )
+            return
+        if self._skull_actor is None:  # initialize
+            self._show_skull(initialize=True)
+
+        if self._skull_button.text() == "Show Skull":
+            self._skull_actor.visibility = True
             self._skull_button.setText("Hide Skull")
         else:
-            if self._skull_button.text() == "Show Skull":
-                self._skull_actor.visibility = True
-                self._skull_button.setText("Hide Skull")
-            else:
-                self._skull_actor.visibility = False
-                self._skull_button.setText("Show Skull")
-
-    def _shrink_skull(self):
-        """Shrink the skull for localizing to the pial surface."""
-        skull_fname = self._check_skull()
-        if skull_fname is None:
-            return
-        if self._skull_actor is not None:
-            self._renderer.plotter.remove_actor(self._skull_actor, render=False)
-        self._show_skull()
+            self._skull_actor.visibility = False
+            self._skull_button.setText("Show Skull")
 
     def _toggle_add_grid(self):
         """Toggle whether the add grid menu is collapsed."""
@@ -696,8 +684,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._renderer.plotter.remove_actor(
                     self._3d_chs.pop(name), render=False
                 )
-            self._show_grid()
-        if self._grid_pos is None:
+            self._show_grid(selected=True)
+        elif self._grid_pos is None:
             self._add_grid_widget.setVisible(not self._add_grid_widget.isVisible())
         else:
             self._move_grid_widget.setVisible(not self._move_grid_widget.isVisible())
