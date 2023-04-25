@@ -151,7 +151,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._grid_collision_dectors = list()
         self._skull_actor = None
         self._skull_mesh = None
-        self._surgical_image_chart = self._surgical_image = None
+        self._surgical_image_chart = None
+        self._surgical_image = None
+        self._surgical_image_view = None
         self._surf_actors = list()
 
         # load data, apply trans
@@ -342,9 +344,21 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout.addStretch(1)
 
         surgical_image_hbox = QHBoxLayout()
+
+        surgical_image_vbox = QVBoxLayout()
         self._surgical_image_button = QPushButton("Add\nSurgical\nImage")
         self._surgical_image_button.released.connect(self._toggle_surgical_image)
-        surgical_image_hbox.addWidget(self._surgical_image_button)
+        surgical_image_vbox.addWidget(self._surgical_image_button)
+
+        self._save_view_button = QPushButton("Save\nView")
+        self._save_view_button.released.connect(self._save_view_surgical_image)
+        surgical_image_vbox.addWidget(self._save_view_button)
+
+        remove_view_button = QPushButton("Remove\nView")
+        remove_view_button.released.connect(self._remove_surgical_image_view)
+        surgical_image_vbox.addWidget(remove_view_button)
+
+        surgical_image_hbox.addLayout(surgical_image_vbox)
 
         surgical_image_sliders_vbox = QVBoxLayout()
 
@@ -473,6 +487,30 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._move_grid_widget.setLayout(move_grid_layout)
         grid_layout.addWidget(self._move_grid_widget)
         return grid_layout
+
+    def _save_view_surgical_image(self):
+        """Save or go to the view."""
+        if self._save_view_button.text() == "Save\nView":
+            self._surgical_image_view = (
+                self._renderer.plotter.camera.position,
+                self._renderer.plotter.camera.focal_point,
+                self._renderer.plotter.camera.azimuth,
+                self._renderer.plotter.camera.elevation,
+                self._renderer.plotter.camera.roll
+            )
+            self._save_view_button.setText("Go To\nView")
+        else:
+            self._renderer.plotter.camera.position = self._surgical_image_view[0]
+            self._renderer.plotter.camera.focal_point = self._surgical_image_view[1]
+            self._renderer.plotter.camera.azimuth = self._surgical_image_view[2]
+            self._renderer.plotter.camera.elevation = self._surgical_image_view[3]
+            self._renderer.plotter.camera.roll = self._surgical_image_view[4]
+            self._renderer._update()
+
+    def _remove_surgical_image_view(self):
+        """Remove a saved surgical image view."""
+        self._save_view_button.setText("Save\nView")
+        self._surgical_image_view = None
 
     def _toggle_surgical_image(self):
         """Toggle showing a surgical image overlaid on the 3D viewer."""
