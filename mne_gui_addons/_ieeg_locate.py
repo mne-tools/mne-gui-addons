@@ -543,7 +543,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Update the opacity of the surgical image."""
         alpha = self._surgical_image_alpha_slider.value() / 100
         self._surgical_image.set_alpha(alpha)
-        self._surgical_image_chart._redraw()
+        self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
     def _update_surgical_image_xoffset(self):
@@ -551,7 +551,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         xoffset = self._surgical_image_xoffset_slider.value() / 100
         loc = self._surgical_image_chart.loc
         self._surgical_image_chart.loc = (xoffset, loc[1])
-        self._surgical_image_chart._redraw()
+        self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
     def _update_surgical_image_yoffset(self):
@@ -567,7 +567,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         xscale = self._surgical_image_xscale_slider.value() / 100
         size = self._surgical_image_chart.size
         self._surgical_image_chart.size = (xscale, size[1])
-        self._surgical_image_chart._redraw()
+        self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
     def _update_surgical_image_yscale(self):
@@ -575,7 +575,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         yscale = self._surgical_image_yscale_slider.value() / 100
         size = self._surgical_image_chart.size
         self._surgical_image_chart.size = (size[0], yscale)
-        self._surgical_image_chart._redraw()
+        self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
     def _update_surgical_image_rotation(self):
@@ -589,7 +589,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._surgical_image.set_transform(
             rot + self._surgical_image_chart._fig.axes[0].transData
         )
-        self._surgical_image_chart._redraw()
+        self._surgical_image_chart._canvas.draw()
         self._renderer._update()
 
     def _add_surface(self):
