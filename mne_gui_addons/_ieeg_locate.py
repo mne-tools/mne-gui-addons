@@ -41,7 +41,6 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.transforms import Affine2D
 
 from pyvista import vtk_points, ChartMPL
-from pyvista.plotting.charts import _Chart
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkCommonTransforms import vtkTransform
 from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
@@ -61,6 +60,8 @@ from mne.transforms import (
 )
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
+from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
+from dipy.align.metrics import CCMetric
 
 _CH_PLOT_SIZE = 1024
 _RADIUS_SCALAR = 0.4
@@ -351,19 +352,27 @@ class IntracranialElectrodeLocator(SliceBrowser):
         move_grid_layout.addWidget(make_label("\t"))  # spacing
 
         surgical_image_hbox = QHBoxLayout()
+
+        surgical_image_vbox = QVBoxLayout()
         self._surgical_image_button = QPushButton("Add Surgical\nImage")
         self._surgical_image_button.released.connect(self._toggle_surgical_image)
-        surgical_image_hbox.addWidget(self._surgical_image_button)
+        surgical_image_vbox.addWidget(self._surgical_image_button)
 
         self._save_view_button = QPushButton("Save\nView")
         self._save_view_button.released.connect(self._save_view_surgical_image)
-        surgical_image_hbox.addWidget(self._save_view_button)
+        surgical_image_vbox.addWidget(self._save_view_button)
 
         remove_view_button = QPushButton("Remove\nView")
         remove_view_button.released.connect(self._remove_surgical_image_view)
-        surgical_image_hbox.addWidget(remove_view_button)
+        surgical_image_vbox.addWidget(remove_view_button)
 
-        move_grid_layout.addLayout(surgical_image_hbox)
+        register_view_button = QPushButton("Register\nView")
+        register_view_button.released.connect(self._register_surgical_image_view)
+        surgical_image_vbox.addWidget(register_view_button)
+
+        surgical_image_hbox.addLayout(surgical_image_vbox)
+
+        surgical_image_trans_vbox = QVBoxLayout()
 
         surgical_image_alpha_hbox = QHBoxLayout()
         surgical_image_alpha_hbox.addWidget(make_label("Alpha"))
@@ -371,43 +380,50 @@ class IntracranialElectrodeLocator(SliceBrowser):
             0, 100, 40, self._update_surgical_image_alpha
         )
         surgical_image_alpha_hbox.addWidget(self._surgical_image_alpha_slider)
-        move_grid_layout.addLayout(surgical_image_alpha_hbox)
+        surgical_image_trans_vbox.addLayout(surgical_image_alpha_hbox)
 
         for trans_type in ("offset", "scale", "rotation"):
             for direction in ("x", "y"):
                 if trans_type == "rotation":
                     if direction == "y":
-                        continue
-                    else:
-                        direction = ""
+                        trans_type = "view roll"
+                    direction = ""
                 direction_layout = QHBoxLayout()
                 buttons[("left", trans_type, direction)] = QPushButton("<")
                 buttons[("left", trans_type, direction)].setFixedSize(50, 20)
                 buttons[("right", trans_type, direction)] = QPushButton(">")
                 buttons[("right", trans_type, direction)].setFixedSize(50, 20)
-                buttons[("left", trans_type, direction)].released.connect(
-                    partial(
-                        self._move_surgical_image,
-                        step=-1,
-                        trans_type=trans_type,
-                        direction=direction,
+                if trans_type == "view roll":
+                    buttons[("left", trans_type, direction)].released.connect(
+                        partial(self._update_view_roll, step=-1))
+                    buttons[("right", trans_type, direction)].released.connect(
+                        partial(self._update_view_roll, step=1))
+                else:
+                    buttons[("left", trans_type, direction)].released.connect(
+                        partial(
+                            self._move_surgical_image,
+                            step=-1,
+                            trans_type=trans_type,
+                            direction=direction,
+                        )
                     )
-                )
-                buttons[("right", trans_type, direction)].released.connect(
-                    partial(
-                        self._move_surgical_image,
-                        step=1,
-                        trans_type=trans_type,
-                        direction=direction,
+                    buttons[("right", trans_type, direction)].released.connect(
+                        partial(
+                            self._move_surgical_image,
+                            step=1,
+                            trans_type=trans_type,
+                            direction=direction,
+                        )
                     )
-                )
                 direction_layout.addWidget(buttons[("left", trans_type, direction)])
                 direction_layout.addWidget(
                     make_label(f"{direction} {trans_type}".strip())
                 )
                 direction_layout.addWidget(buttons[("right", trans_type, direction)])
-                move_grid_layout.addLayout(direction_layout)
+                surgical_image_trans_vbox.addLayout(direction_layout)
 
+        surgical_image_hbox.addLayout(surgical_image_trans_vbox)
+        move_grid_layout.addLayout(surgical_image_hbox)
         move_grid_layout.addWidget(make_label("\t"))  # spacer
 
         step_size_layout = QHBoxLayout()
@@ -492,6 +508,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_layout.addWidget(self._move_grid_widget)
         return grid_layout
 
+    def _update_view_roll(self, step):
+        """Update the roll of the camera."""
+        self._renderer.plotter.camera.roll += \
+            step * self._step_size_slider.value() / 100
+        self._renderer._update()
+
     def _update_grid_radius(self):
         """Update the radius of the grid contacts."""
         if self._grid_radius_spin_box.value() == 0:
@@ -528,6 +550,36 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._save_view_button.setText("Save\nView")
         self._surgical_image_view = None
 
+    def _register_surgical_image_view(self):
+        """Use a 2D symmetric diffeomorphic transform to register the view."""
+        # import cv2
+        # turn off grid for now
+        self._grid_actor.visibility = False
+        for actor in self._grid_actors:
+            actor.visibility = False
+
+        # no grid for original shot
+        self._surgical_image_chart.visible = False
+        self._renderer._update()
+
+        static = self._renderer.screenshot()
+
+        # grid on for moving
+        self._surgical_image_chart.visible = True
+        self._renderer._update()
+
+        moving = self._renderer.screenshot()
+
+        sdr = SymmetricDiffeomorphicRegistration(CCMetric(dim=2))
+        mapping = sdr.optimize(static.mean(axis=-1), moving.mean(axis=-1))
+        warped = mapping.transform(moving.mean(axis=-1))
+
+        # turn back on grid visibility
+        self._grid_actor.visibility = True
+        for actor in self._grid_actors:
+            actor.visibility = True
+        self._renderer._update()
+
     def _toggle_surgical_image(self):
         """Toggle showing a surgical image overlaid on the 3D viewer."""
         if self._surgical_image_chart is None:
@@ -540,7 +592,18 @@ class IntracranialElectrodeLocator(SliceBrowser):
             fig = Figure()
             ax = fig.add_axes([0, 0, 1, 1])
             ax.axis("off")
-            self._surgical_image = ax.imshow(im_data, aspect="auto", alpha=0.4)
+            margin = np.mean(im_data.shape) * 0.2
+            self._surgical_image = ax.imshow(
+                im_data,
+                aspect="auto",
+                extent=[
+                    -margin,
+                    im_data.shape[0] + margin,
+                    -margin,
+                    im_data.shape[1] + margin,
+                ],
+                alpha=0.4,
+            )
             self._surgical_image_chart = ChartMPL(fig, size=(0.8, 0.8), loc=(0.1, 0.1))
             self._surgical_image_chart.border_color = (0, 0, 0, 0)
             self._renderer.plotter.add_chart(self._surgical_image_chart)
@@ -591,12 +654,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 else:
                     assert direction == "y"
                     loc = (loc[0], loc[1] + step_size)
-                # self._surgical_image_chart.loc = loc
-                # workaround, above doesn't update
+                # bug: loc and position don't sync with each other: do manually
                 self._surgical_image_chart.position = (
                     int(loc[0] * r_w),
                     int(loc[1] * r_h),
                 )
+                self._surgical_image_chart.loc = loc
             else:
                 size = self._surgical_image_chart.size
                 assert trans_type == "scale"
