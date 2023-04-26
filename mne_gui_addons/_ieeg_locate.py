@@ -582,9 +582,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
         else:
             step_size = step * self._step_size_slider.value() / 10000
-            loc = self._surgical_image_chart.loc
-            size = self._surgical_image_chart.size
             if trans_type == "offset":
+                r_w, r_h = self._surgical_image_chart._renderer.GetSize()
+                position = self._surgical_image_chart.position
+                loc = (position[0] / r_w, position[1] / r_h)
                 if direction == "x":
                     loc = (loc[0] + step_size, loc[1])
                 else:
@@ -592,12 +593,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     loc = (loc[0], loc[1] + step_size)
                 # self._surgical_image_chart.loc = loc
                 # workaround, above doesn't update
-                r_w, r_h = self._surgical_image_chart._renderer.GetSize()
                 self._surgical_image_chart.position = (
                     int(loc[0] * r_w),
                     int(loc[1] * r_h),
                 )
             else:
+                size = self._surgical_image_chart.size
                 assert trans_type == "scale"
                 if direction == "x":
                     size = (size[0] + step_size, size[1])
