@@ -364,10 +364,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         remove_view_button.released.connect(self._remove_surgical_image_view)
         surgical_image_vbox.addWidget(remove_view_button)
 
-        register_view_button = QPushButton("Register\nView")
-        register_view_button.released.connect(self._register_surgical_image_view)
-        surgical_image_vbox.addWidget(register_view_button)
-
         surgical_image_hbox.addLayout(surgical_image_vbox)
 
         surgical_image_trans_vbox = QVBoxLayout()
@@ -550,54 +546,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Remove a saved surgical image view."""
         self._save_view_button.setText("Save\nView")
         self._surgical_image_view = None
-
-    def _register_surgical_image_view(self):
-        """Use a 2D symmetric diffeomorphic transform to register the view."""
-        import cv2
-
-        # turn off grid for now
-        self._grid_actor.visibility = False
-        for actor in self._grid_actors:
-            actor.visibility = False
-
-        # no grid for original shot
-        self._surgical_image_chart.visible = False
-        self._renderer._update()
-
-        static = self._renderer.screenshot()
-        moving = np.array(self._surgical_image.get_array()[..., :3])
-        moving = (moving * 255).round().astype(np.uint8)
-
-        static_gray = cv2.cvtColor(static, cv2.COLOR_BGR2GRAY)
-        moving_gray = cv2.cvtColor(moving, cv2.COLOR_BGR2GRAY)
-
-        orb_detector = cv2.ORB_create(5000)
-
-        kp1, d1 = orb_detector.detectAndCompute(static_gray, None)
-        kp2, d2 = orb_detector.detectAndCompute(moving_gray, None)
-        matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        matches = list(matcher.match(d1, d2))
-        matches.sort(key=lambda x: x.distance)
-
-        matches = matches[: int(len(matches) * 0.9)]
-        n_matches = len(matches)
-
-        p1 = np.zeros((n_matches, 2))
-        p2 = np.zeros((n_matches, 2))
-
-        for i in range(len(matches)):
-            p1[i, :] = kp1[matches[i].queryIdx].pt
-            p2[i, :] = kp2[matches[i].trainIdx].pt
-
-        homography, mask = cv2.findHomography(p2, p1, cv2.RANSAC)
-
-        warped = cv2.warpPerspective(moving, homography, static_gray.shape)
-
-        # turn back on grid visibility
-        self._grid_actor.visibility = True
-        for actor in self._grid_actors:
-            actor.visibility = True
-        self._renderer._update()
 
     def _toggle_surgical_image(self):
         """Toggle showing a surgical image overlaid on the 3D viewer."""
