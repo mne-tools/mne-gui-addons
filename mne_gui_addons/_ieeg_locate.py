@@ -44,6 +44,7 @@ from pyvista import vtk_points
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkCommonTransforms import vtkTransform
 from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
+from vtkmodules.util.numpy_support import vtk_to_numpy
 
 from ._core import SliceBrowser, make_label
 from mne.channels import make_dig_montage
@@ -144,7 +145,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         # initialize grid data
         self._grid_ch_index = 0
         self._grid_pos = None
-        self._grid_radius = None
         self._grid_actor = None
         self._grid_mesh = None
         self._grid_actors = None
@@ -308,12 +308,24 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         move_grid_layout = QVBoxLayout()
 
+        radius_hbox = QHBoxLayout()
+        radius_hbox.addWidget(make_label("Grid Radius"))
+        self._grid_radius_spin_box = QDoubleSpinBox()
+        self._grid_radius_spin_box.setRange(0.001, 2)
+        self._grid_radius_spin_box.setSingleStep(0.01)
+        self._grid_radius_spin_box.setValue(1)
+        self._grid_radius_spin_box.valueChanged.connect(self._update_grid_radius)
+        radius_hbox.addWidget(self._grid_radius_spin_box)
+        move_grid_layout.addLayout(radius_hbox)
+
         buttons = dict()
         for trans_type in ("trans", "rotation"):
             for direction in ("x", "y", "z"):
                 direction_layout = QHBoxLayout()
                 buttons[("left", trans_type, direction)] = QPushButton("<")
+                buttons[("left", trans_type, direction)].setFixedSize(50, 20)
                 buttons[("right", trans_type, direction)] = QPushButton(">")
+                buttons[("right", trans_type, direction)].setFixedSize(50, 20)
                 buttons[("left", trans_type, direction)].released.connect(
                     partial(
                         self._move_grid,
@@ -369,7 +381,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
                         direction = ""
                 direction_layout = QHBoxLayout()
                 buttons[("left", trans_type, direction)] = QPushButton("<")
+                buttons[("left", trans_type, direction)].setFixedSize(50, 20)
                 buttons[("right", trans_type, direction)] = QPushButton(">")
+                buttons[("right", trans_type, direction)].setFixedSize(50, 20)
                 buttons[("left", trans_type, direction)].released.connect(
                     partial(
                         self._move_surgical_image,
@@ -449,12 +463,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         next_button.released.connect(self._next_grid)
         button_layout[0].addWidget(next_button)
 
-        mark_button = QPushButton("Mark")
-        mark_button.released.connect(self._mark_grid)
+        mark_button = QPushButton("Back")
+        mark_button.released.connect(self._back_grid)
         button_layout[0].addWidget(mark_button)
 
-        auto_mark_button = QPushButton("Auto Mark")
-        auto_mark_button.released.connect(self._auto_mark_grid)
+        auto_mark_button = QPushButton("Mark")
+        auto_mark_button.released.connect(self._mark_grid)
         button_layout[0].addWidget(auto_mark_button)
 
         self._undo_button = QPushButton("Undo")
@@ -476,6 +490,18 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._move_grid_widget.setLayout(move_grid_layout)
         grid_layout.addWidget(self._move_grid_widget)
         return grid_layout
+
+    def _update_grid_radius(self):
+        """Update the radius of the grid contacts."""
+        if self._grid_radius_spin_box.value() == 0:
+            return
+        for mesh, center in zip(self._grid_meshes, self._grid_pos[-1]):
+            rr = vtk_to_numpy(mesh.GetPoints().GetData())
+            rr = _cart_to_sph(rr - center)
+            rr[:, 0] = self._grid_radius_spin_box.value() / 2
+            rr = _sph_to_cart(rr) + center
+            mesh.SetPoints(vtk_points(rr))
+        self._renderer._update()
 
     def _save_view_surgical_image(self):
         """Save or go to the view."""
@@ -639,6 +665,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._grid_collision_dectors.append(collide)
         else:
             self._skull_mesh.SetPoints(vtk_points(rr))
+            self._renderer._update()
 
     def _toggle_skull(self):
         """Toggle whether the skull is showing and colliding with the grid."""
@@ -660,6 +687,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         else:
             self._skull_actor.visibility = False
             self._skull_button.setText("Show Skull")
+        self._renderer._update()
 
     def _toggle_add_grid(self):
         """Toggle whether the add grid menu is collapsed."""
@@ -677,9 +705,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 )
             ]
             self._grid_tris = Delaunay(self._grid_pos[-1][:, 1:]).simplices
-            self._grid_radius, _ = QInputDialog.getDouble(
-                self, "Grid Radius", "radius (mm)"
-            )
             for name in self._3d_chs.copy():
                 self._renderer.plotter.remove_actor(
                     self._3d_chs.pop(name), render=False
@@ -714,7 +739,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos += self._ras
         self._grid_pos = [grid_pos]
         self._grid_tris = Delaunay(grid_pos[:, 1:]).simplices
-        self._grid_radius = self._radius_spin_box.value()
         self._show_grid()
 
     def _import_grid(self):
@@ -732,9 +756,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_pos += self._ras
         self._grid_pos = [grid_pos]
         self._grid_tris = Delaunay(grid_pos[:, 1:]).simplices
-        self._grid_radius, _ = QInputDialog.getDouble(
-            self, "Grid Radius", "radius (mm)"
-        )
         self._show_grid()
 
     def _show_grid(self, selected=False):
@@ -746,7 +767,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         for i, (x, y, z) in enumerate(self._grid_pos[-1]):
             actor, mesh = self._renderer.sphere(
                 (x, y, z),
-                scale=self._grid_radius,
+                scale=self._grid_radius_spin_box.value(),
                 color="yellow"
                 if i == self._grid_ch_index
                 else ("blue" if selected else "red"),
@@ -801,7 +822,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         for actor in self._grid_actors:
             self._renderer.plotter.remove_actor(actor)
         self._grid_pos = None
-        self._grid_radius = None
         self._grid_actors = None
         self._grid_meshes = None
         self._add_grid_widget.setVisible(True)
@@ -1184,25 +1204,25 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._ch_index = (self._ch_index + 1) % len(self._ch_names)
         self._update_ch_selection()
 
-    def _update_grid_selection(self, selected=False):
+    def _update_grid_selection(self, step=1, selected=False):
         """Update which grid channel is selected."""
         # remove selected yellow sphere, replace with gray
         self._renderer.plotter.remove_actor(self._grid_actors[self._grid_ch_index])
         actor, mesh = self._renderer.sphere(
             tuple(self._grid_pos[-1][self._grid_ch_index]),
-            scale=self._grid_radius,
+            scale=self._grid_radius_spin_box.value(),
             color="blue" if selected else "red",
             opacity=1,
         )
         self._grid_actors[self._grid_ch_index] = actor
         self._grid_meshes[self._grid_ch_index] = mesh
 
-        self._grid_ch_index = (self._grid_ch_index + 1) % self._grid_pos[-1].size
+        self._grid_ch_index = (self._grid_ch_index + step) % self._grid_pos[-1].size
 
         # remove gray sphere, replace with yellow
         actor, mesh = self._renderer.sphere(
             tuple(self._grid_pos[-1][self._grid_ch_index]),
-            scale=self._grid_radius,
+            scale=self._grid_radius_spin_box.value(),
             color="yellow",
             opacity=1,
         )
@@ -1221,8 +1241,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._undo_button.setEnabled(False)
 
     def _next_grid(self):
-        """Increment the grid selection index."""
-        self._update_grid_selection()
+        """Increment the grid selection."""
+        self._update_grid_selection(step=1)
+
+    def _back_grid(self):
+        """Decrement the grid selection."""
+        self._update_grid_selection(step=-1)
 
     def _color_list_item(self, name=None):
         """Color the item in the view list for easy id of marked channels."""
@@ -1258,8 +1282,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._snap_button.setText("Off")
             self._snap_button.setStyleSheet("background-color: red")
 
-    def _auto_mark_grid(self):
-        """Mark a large grid based on the first two or more entries."""
+    def _mark_grid(self):
+        """Mark a large grid in its entirety."""
         if len(self._ch_names) - self._ch_index < self._grid_pos[-1].shape[0]:
             QMessageBox.information(
                 self,
@@ -1279,17 +1303,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._renderer.plotter.remove_actor(actor, render=False)
         self._show_grid(selected=True)
         self._save_ch_coords()
-        self._ch_list.setFocus()
-
-    def _mark_grid(self):
-        """Mark a channel on the grid."""
-        self._chs[self._ch_names[self._ch_index]] = self._grid_pos[-1][
-            self._grid_ch_index
-        ]
-        self._update_grid_selection(selected=True)
-        self._color_list_item()
-        self._save_ch_coords()
-        self._next_ch()
         self._ch_list.setFocus()
 
     @Slot()
