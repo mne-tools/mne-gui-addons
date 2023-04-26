@@ -60,8 +60,6 @@ from mne.transforms import (
 )
 from mne.utils import logger, _validate_type, verbose
 from mne import pick_types
-from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
-from dipy.align.metrics import CCMetric
 
 _CH_PLOT_SIZE = 1024
 _RADIUS_SCALAR = 0.4
@@ -395,9 +393,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 buttons[("right", trans_type, direction)].setFixedSize(50, 20)
                 if trans_type == "view roll":
                     buttons[("left", trans_type, direction)].released.connect(
-                        partial(self._update_view_roll, step=-1))
+                        partial(self._update_view_roll, step=-1)
+                    )
                     buttons[("right", trans_type, direction)].released.connect(
-                        partial(self._update_view_roll, step=1))
+                        partial(self._update_view_roll, step=1)
+                    )
                 else:
                     buttons[("left", trans_type, direction)].released.connect(
                         partial(
@@ -510,8 +510,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _update_view_roll(self, step):
         """Update the roll of the camera."""
-        self._renderer.plotter.camera.roll += \
+        self._renderer.plotter.camera.roll += (
             step * self._step_size_slider.value() / 100
+        )
         self._renderer._update()
 
     def _update_grid_radius(self):
@@ -552,7 +553,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _register_surgical_image_view(self):
         """Use a 2D symmetric diffeomorphic transform to register the view."""
-        # import cv2
+        import cv2
+
         # turn off grid for now
         self._grid_actor.visibility = False
         for actor in self._grid_actors:
@@ -563,16 +565,33 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._renderer._update()
 
         static = self._renderer.screenshot()
+        moving = np.array(self._surgical_image.get_array()[..., :3])
+        moving = (moving * 255).round().astype(np.uint8)
 
-        # grid on for moving
-        self._surgical_image_chart.visible = True
-        self._renderer._update()
+        static_gray = cv2.cvtColor(static, cv2.COLOR_BGR2GRAY)
+        moving_gray = cv2.cvtColor(moving, cv2.COLOR_BGR2GRAY)
 
-        moving = self._renderer.screenshot()
+        orb_detector = cv2.ORB_create(5000)
 
-        sdr = SymmetricDiffeomorphicRegistration(CCMetric(dim=2))
-        mapping = sdr.optimize(static.mean(axis=-1), moving.mean(axis=-1))
-        warped = mapping.transform(moving.mean(axis=-1))
+        kp1, d1 = orb_detector.detectAndCompute(static_gray, None)
+        kp2, d2 = orb_detector.detectAndCompute(moving_gray, None)
+        matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = list(matcher.match(d1, d2))
+        matches.sort(key=lambda x: x.distance)
+
+        matches = matches[: int(len(matches) * 0.9)]
+        n_matches = len(matches)
+
+        p1 = np.zeros((n_matches, 2))
+        p2 = np.zeros((n_matches, 2))
+
+        for i in range(len(matches)):
+            p1[i, :] = kp1[matches[i].queryIdx].pt
+            p2[i, :] = kp2[matches[i].trainIdx].pt
+
+        homography, mask = cv2.findHomography(p2, p1, cv2.RANSAC)
+
+        warped = cv2.warpPerspective(moving, homography, static_gray.shape)
 
         # turn back on grid visibility
         self._grid_actor.visibility = True
