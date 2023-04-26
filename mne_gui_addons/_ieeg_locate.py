@@ -40,7 +40,8 @@ from matplotlib.pyplot import Figure, imread
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.transforms import Affine2D
 
-from pyvista import vtk_points
+from pyvista import vtk_points, ChartMPL
+from pyvista.plotting.charts import _Chart
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkCommonTransforms import vtkTransform
 from vtkmodules.vtkFiltersModeling import vtkCollisionDetectionFilter
@@ -530,8 +531,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _toggle_surgical_image(self):
         """Toggle showing a surgical image overlaid on the 3D viewer."""
         if self._surgical_image_chart is None:
-            from pyvista import ChartMPL
-
             fname, _ = QFileDialog.getOpenFileName(
                 self, caption="Surgical Image", filter="(*.png *.jpg *.jpeg)"
             )
@@ -543,6 +542,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ax.axis("off")
             self._surgical_image = ax.imshow(im_data, aspect="auto", alpha=0.4)
             self._surgical_image_chart = ChartMPL(fig, size=(0.8, 0.8), loc=(0.1, 0.1))
+            self._surgical_image_chart.border_color = (0, 0, 0, 0)
             self._renderer.plotter.add_chart(self._surgical_image_chart)
             self._surgical_image_button.setText("Hide\nSurgical\nImage")
         else:
@@ -590,6 +590,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 else:
                     assert direction == "y"
                     loc = (loc[0], loc[1] + step_size)
+                # self._surgical_image_chart.loc = loc
+                # workaround, above doesn't update
+                r_w, r_h = self._surgical_image_chart._renderer.GetSize()
+                self._surgical_image_chart.position = (
+                    int(loc[0] * r_w),
+                    int(loc[1] * r_h),
+                )
             else:
                 assert trans_type == "scale"
                 if direction == "x":
@@ -597,10 +604,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 else:
                     assert direction == "y"
                     size = (size[0], size[1] + step_size)
-            self._surgical_image_chart.loc = loc
-            self._surgical_image_chart.size = size
+                self._surgical_image_chart.size = size
         self._surgical_image_chart._canvas.draw()
-        self._surgical_image_chart._redraw(event=True)
+        self._surgical_image_chart._redraw()
         self._renderer._update()
 
     def _add_surface(self):
