@@ -102,7 +102,7 @@ def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_pat
         "EEG 003": "LSTN 1",
         "EEG 004": "LSTN 2",
     }
-    raw.pick_channels(list(ch_dict.keys()))
+    raw.pick(list(ch_dict.keys()))
     raw.rename_channels(ch_dict)
     raw.set_montage(None)
     aligned_ct, _ = _fake_CT_coords
@@ -137,7 +137,7 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
         "EEG 003": "LSTN 1",
         "EEG 004": "LSTN 2",
     }
-    raw.pick_channels(list(ch_dict.keys()))
+    raw.pick(list(ch_dict.keys()))
     raw.rename_channels(ch_dict)
     raw.set_eeg_reference("average")
     raw.set_channel_types({name: "seeg" for name in raw.ch_names})

@@ -267,7 +267,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         )
         self._alpha = 0.75
         self._epoch_idx = (
-            "Subject 0" if self._group else "Average" + " Power" * self._is_complex
+            "Average" + " Power" * (self._is_complex and not self._group)
         )
 
         # initialize current 3D image for chosen time and frequency
@@ -590,12 +590,11 @@ class VolSourceEstimateViewer(SliceBrowser):
 
         if self._data.shape[0] > 1:
             self._epoch_selector = QComboBox()
-            if not self._group:
-                if self._is_complex:
-                    self._epoch_selector.addItems(["Average Power"])
-                    self._epoch_selector.addItems(["ITC"])
-                else:
-                    self._epoch_selector.addItems(["Average"])
+            if self._is_complex and not self._group:
+                self._epoch_selector.addItems(["Average Power"])
+                self._epoch_selector.addItems(["ITC"])
+            else:
+                self._epoch_selector.addItems(["Average"])
             self._epoch_selector.addItems(
                 [f"{self._selector_prefix} {i}" for i in range(self._data.shape[0])]
             )
@@ -824,31 +823,39 @@ class VolSourceEstimateViewer(SliceBrowser):
         units = DEFAULTS["units"][dtype]
         scaling = DEFAULTS["scalings"][dtype]
 
-        inst = (
-            self._insts[int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))]
-            if self._group
-            else self._inst
-        )
-        if isinstance(inst, EpochsTFR):
-            inst_data = inst.data
+        if isinstance(self._inst, EpochsTFR):
             scaling *= scaling  # power is squared
             units = f"({units})" + r"$^2$/Hz"
-        elif isinstance(inst, BaseEpochs):
-            inst_data = inst.get_data()
-        else:
-            inst_data = inst.data[None]  # new axis for single epoch
-
-        # convert to power or ITC for group
-        if self._group == "ITC" and np.iscomplexobj(inst_data):
-            inst_data = np.abs((inst_data / np.abs(inst_data)))
-        elif self._group and np.iscomplexobj(inst_data):  # power
-            inst_data = (inst_data * inst_data.conj()).real
 
         if self._epoch_idx == "ITC":
             units = "ITC"
             scaling = 1
 
-        pick_idx = _picks_to_idx(inst.info, dtype)
+        def get_inst_data(inst):
+            if isinstance(inst, EpochsTFR):
+                inst_data = inst.data
+            elif isinstance(inst, BaseEpochs):
+                inst_data = inst.get_data()
+            else:
+                inst_data = inst.data[None]  # new axis for single epoch
+            # convert to power or ITC for group
+            if self._group == "ITC" and np.iscomplexobj(inst_data):
+                inst_data = np.abs((inst_data / np.abs(inst_data)))
+            elif self._group and np.iscomplexobj(inst_data):  # power
+                inst_data = (inst_data * inst_data.conj()).real
+            return inst_data
+
+        if self._group:
+            if self._epoch_idx == "Average":
+                inst_data = np.concatenate([get_inst_data(inst)
+                                            for inst in self._insts], axis=0)
+            else:
+                inst_data = get_inst_data(
+                    self._insts[int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))])
+        else:
+            inst_data = get_inst_data(self._inst)
+
+        pick_idx = _picks_to_idx(self._inst.info, dtype)
         inst_data = inst_data[:, pick_idx]
 
         evo_data = self._pick_epoch(inst_data) * scaling
@@ -866,7 +873,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 copy=False,
             )
 
-        info = _pick_inst(inst, dtype, "bads").info
+        info = _pick_inst(self._inst, dtype, "bads").info
         ave = EvokedArray(evo_data, info, tmin=self._inst.times[0])
 
         ave_max = evo_data.max()
