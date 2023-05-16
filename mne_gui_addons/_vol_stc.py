@@ -266,9 +266,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._inst.freqs.size // 2 if hasattr(self._inst, "freqs") else None
         )
         self._alpha = 0.75
-        self._epoch_idx = (
-            "Average" + " Power" * (self._is_complex and not self._group)
-        )
+        self._epoch_idx = "Average" + " Power" * (self._is_complex and not self._group)
 
         # initialize current 3D image for chosen time and frequency
         stc_data = self._pick_epoch(self._data)
@@ -847,11 +845,15 @@ class VolSourceEstimateViewer(SliceBrowser):
 
         if self._group:
             if self._epoch_idx == "Average":
-                inst_data = np.concatenate([get_inst_data(inst)
-                                            for inst in self._insts], axis=0)
+                inst_data = np.concatenate(
+                    [get_inst_data(inst) for inst in self._insts], axis=0
+                )
             else:
                 inst_data = get_inst_data(
-                    self._insts[int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))])
+                    self._insts[
+                        int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))
+                    ]
+                )
         else:
             inst_data = get_inst_data(self._inst)
 
