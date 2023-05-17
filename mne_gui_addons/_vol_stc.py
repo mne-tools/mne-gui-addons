@@ -144,8 +144,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             averaged across epochs and ``n_freqs`` may be 1 for data
             that is in time only and is not time-frequency decomposed. For
             faster performance, data can be cast to integers or a
-            custom complex data type that uses integers as done by
-            :func:`mne.gui.view_vol_stc`.
+            custom complex data type that uses integers.
         %(subject)s
         %(subjects_dir)s
         src : instance of SourceSpaces
