@@ -75,6 +75,7 @@ for sub in range(1, 4):
         baseline=None,
         preload=True,
     )
+    del raw
     epochs.set_eeg_reference(projection=True)
 
     # reject bad epochs
@@ -91,7 +92,7 @@ for sub in range(1, 4):
 
     # make forward model
     fwd = mne.make_forward_solution(
-        raw.info, trans=trans, src=src, bem=bem, eeg=True, mindist=5.0
+        epochs.info, trans=trans, src=src, bem=bem, eeg=True, mindist=5.0
     )
 
     rank = mne.compute_rank(epochs, tol=1e-6, tol_kind="relative")
@@ -182,14 +183,15 @@ viewer = mne_gui.view_vol_stc(
 viewer.go_to_extreme()  # show the maximum intensity source vertex
 viewer.set_cmap(vmin=0.25, vmid=0.8)
 viewer.set_3d_view(azimuth=40, elevation=35, distance=300)
+del stcs_epochs, insts_epochs
 
 # %%
-# Use the viewer to explore the time-frequency source estimates, specifically
-# inter-trial coherence (itc).
+# Use the viewer to explore the time-frequency source estimates, we'll
+# use the power in this case but you can also view inter-trial coherence (itc).
 
 viewer = mne_gui.view_vol_stc(
     stcs_tfr,
-    group="itc",
+    group="power",  # can also be "itc"
     subject=template,
     subjects_dir=subjects_dir,
     src=src,
@@ -200,3 +202,4 @@ viewer = mne_gui.view_vol_stc(
 viewer.go_to_extreme()  # show the maximum intensity source vertex
 viewer.set_cmap(vmin=0.25, vmid=0.8)
 viewer.set_3d_view(azimuth=40, elevation=35, distance=300)
+del stcs_tfr, insts_tfr
