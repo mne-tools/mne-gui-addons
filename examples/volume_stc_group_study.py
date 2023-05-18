@@ -1,11 +1,12 @@
 """
-.. _ex-ieeg-micro:
+.. _ex-vol-stc-group:
 
 ====================================================
 Volume Source Time Course Estimate for a Group Study
 ====================================================
 
-
+In this example, we'll show how to use the MNE volume stc viewing
+GUI to compare brain activity across subjects in a group study.
 """
 
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
