@@ -6,7 +6,7 @@ requires-python = ">=3.8"
 license = {file = "LICENSE"}
 keywords = ["science", "neuroscience", "psychology"]
 authors = [
-  {name = "Alex Rockhill", email = "aprockhill206@gmail.com"},
+  {name = "Alex Rockhill", email = "aprockhill@mailbox.org"},
   {name = "Eric Larson"},
 ]
 classifiers = [
