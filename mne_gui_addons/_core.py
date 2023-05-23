@@ -27,6 +27,7 @@ from matplotlib import patheffects
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
+from matplotlib.colors import LinearSegmentedColormap
 
 from mne.viz.backends.renderer import _get_renderer
 from mne.viz.utils import safe_event
@@ -44,6 +45,48 @@ from mne.viz.backends._utils import _qt_safe_window
 
 _IMG_LABELS = [["I", "P"], ["I", "L"], ["P", "L"]]
 _ZOOM_STEP_SIZE = 5
+
+# 20 colors generated to be evenly spaced in a cube, worked better than
+# matplotlib color cycle
+_UNIQUE_COLORS = [
+    (0.1, 0.42, 0.43),
+    (0.9, 0.34, 0.62),
+    (0.47, 0.51, 0.3),
+    (0.47, 0.55, 0.99),
+    (0.79, 0.68, 0.06),
+    (0.34, 0.74, 0.05),
+    (0.58, 0.87, 0.13),
+    (0.86, 0.98, 0.4),
+    (0.92, 0.91, 0.66),
+    (0.77, 0.38, 0.34),
+    (0.9, 0.37, 0.1),
+    (0.2, 0.62, 0.9),
+    (0.22, 0.65, 0.64),
+    (0.14, 0.94, 0.8),
+    (0.34, 0.31, 0.68),
+    (0.59, 0.28, 0.74),
+    (0.46, 0.19, 0.94),
+    (0.37, 0.93, 0.7),
+    (0.56, 0.86, 0.55),
+    (0.67, 0.69, 0.44),
+]
+_N_COLORS = len(_UNIQUE_COLORS)
+_CMAP = LinearSegmentedColormap.from_list("colors", _UNIQUE_COLORS, N=_N_COLORS)
+
+
+def _get_volume_info(img):
+    header = img.header
+    version = header["version"]
+    vol_info = dict(head=[20])
+    if version == 1:
+        version = f"{version}  # volume info valid"
+        vol_info["valid"] = version
+        vol_info["filename"] = img.get_filename()
+        vol_info["volume"] = header["dims"][:3]
+        vol_info["voxelsize"] = header["delta"]
+        vol_info["xras"], vol_info["yras"], vol_info["zras"] = header["Mdc"]
+        vol_info["cras"] = header["Pxyz_c"]
+    return vol_info
 
 
 @verbose
@@ -67,7 +110,7 @@ def _load_image(img, verbose=None):
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
     vox_ras_t = np.dot(orig_mgh.header.get_vox2ras_tkr(), aff_trans)
     vox_scan_ras_t = np.dot(orig_mgh.header.get_vox2ras(), aff_trans)
-    return img_data, vox_ras_t, vox_scan_ras_t
+    return img_data, vox_ras_t, vox_scan_ras_t, _get_volume_info(orig_mgh)
 
 
 def _make_mpl_plot(
@@ -94,6 +137,12 @@ def _make_mpl_plot(
     return canvas, fig
 
 
+def make_label(name):
+    label = QLabel(name)
+    label.setAlignment(QtCore.Qt.AlignCenter)
+    return label
+
+
 class SliceBrowser(QMainWindow):
     """Navigate between slices of an MRI, CT, etc. image."""
 
@@ -104,7 +153,14 @@ class SliceBrowser(QMainWindow):
     )
 
     @_qt_safe_window(splash="_renderer.figure.splash", window="")
-    def __init__(self, base_image=None, subject=None, subjects_dir=None, verbose=None):
+    def __init__(
+        self,
+        base_image=None,
+        subject=None,
+        subjects_dir=None,
+        check_aligned=True,
+        verbose=None,
+    ):
         """GUI for browsing slices of anatomical images."""
         # initialize QMainWindow class
         super(SliceBrowser, self).__init__()
@@ -117,7 +173,7 @@ class SliceBrowser(QMainWindow):
         self._subject_dir = (
             op.join(subjects_dir, subject) if subject and subjects_dir else None
         )
-        self._load_image_data(base_image=base_image)
+        self._load_image_data(base_image=base_image, check_aligned=check_aligned)
 
         # GUI design
 
@@ -154,7 +210,7 @@ class SliceBrowser(QMainWindow):
         central_widget.setLayout(main_vbox)
         self.setCentralWidget(central_widget)
 
-    def _load_image_data(self, base_image=None):
+    def _load_image_data(self, base_image=None, check_aligned=True):
         """Get image data to display and transforms to/from vox/RAS."""
         if self._subject_dir is None:
             # if the recon-all is not finished or the CT is not
@@ -168,30 +224,38 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, vox_ras_t, vox_scan_ras_t = _load_image(
-                op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
-            )
+            (
+                self._mri_data,
+                self._mri_vox_ras_t,
+                self._mri_vox_scan_ras_t,
+                self._vol_info,
+            ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
+            self._mri_ras_vox_t = np.linalg.inv(self._mri_vox_ras_t)
+            self._mri_scan_ras_vox_t = np.linalg.inv(self._mri_vox_scan_ras_t)
 
         # ready alternate base image if provided, otherwise use brain/T1
         if base_image is None:
             assert self._mri_data is not None
             self._base_data = self._mri_data
-            self._vox_ras_t = vox_ras_t
-            self._vox_scan_ras_t = vox_scan_ras_t
+            self._vox_ras_t = self._mri_vox_ras_t
+            self._vox_scan_ras_t = self._mri_vox_scan_ras_t
         else:
-            self._base_data, self._vox_ras_t, self._vox_scan_ras_t = _load_image(
-                base_image
-            )
-            if self._mri_data is not None:
+            (
+                self._base_data,
+                self._vox_ras_t,
+                self._vox_scan_ras_t,
+                self._vol_info,
+            ) = _load_image(base_image)
+            if self._mri_data is not None and check_aligned:
                 if self._mri_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_ras_t, vox_ras_t, rtol=1e-6
+                    self._vox_ras_t, self._mri_vox_ras_t, rtol=1e-6
                 ):
                     raise ValueError(
                         "Base image is not aligned to MRI, got "
                         f"Base shape={self._base_data.shape}, "
                         f"MRI shape={self._mri_data.shape}, "
-                        f"Base affine={vox_ras_t} and "
-                        f"MRI affine={self._vox_ras_t}, "
+                        f"Base affine={self._vox_ras_t} and "
+                        f"MRI affine={self._mri_vox_ras_t}, "
                         "please provide an aligned image or do not use the "
                         "``subject`` and ``subjects_dir`` arguments"
                     )
@@ -351,7 +415,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
         if self._lh is not None and self._rh is not None:
-            self._renderer.mesh(
+            self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
                 color="white",
@@ -359,7 +423,7 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
-            self._renderer.mesh(
+            self._rh_actor, _ = self._renderer.mesh(
                 *self._rh["rr"].T * 1000,
                 triangles=self._rh["tris"],
                 color="white",
@@ -367,6 +431,8 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
+        else:
+            self._lh_actor = self._rh_actor = None
         self._renderer.set_camera(
             azimuth=90, elevation=90, distance=300, focalpoint=tuple(self._ras)
         )
@@ -508,6 +574,7 @@ class SliceBrowser(QMainWindow):
         logger.debug(f"Setting RAS: ({msg}) mm")
         if update_plots:
             self._move_cursors_to_pos()
+        self.setFocus()  # focus back to main
 
     def set_vox(self, vox):
         """Set the crosshairs to a given voxel coordinate.

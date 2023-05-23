@@ -25,9 +25,7 @@ from qtpy.QtWidgets import (
     QComboBox,
 )
 
-from matplotlib.colors import LinearSegmentedColormap
-
-from ._core import SliceBrowser
+from ._core import SliceBrowser, _CMAP, _N_COLORS
 from mne.channels import make_dig_montage
 from mne.surface import _voxel_neighbors
 from mne.transforms import apply_trans, _get_trans, invert_transform
@@ -39,33 +37,6 @@ _RADIUS_SCALAR = 0.4
 _TUBE_SCALAR = 0.1
 _BOLT_SCALAR = 30  # mm
 _CH_MENU_WIDTH = 30 if platform.system() == "Windows" else 10
-
-# 20 colors generated to be evenly spaced in a cube, worked better than
-# matplotlib color cycle
-_UNIQUE_COLORS = [
-    (0.1, 0.42, 0.43),
-    (0.9, 0.34, 0.62),
-    (0.47, 0.51, 0.3),
-    (0.47, 0.55, 0.99),
-    (0.79, 0.68, 0.06),
-    (0.34, 0.74, 0.05),
-    (0.58, 0.87, 0.13),
-    (0.86, 0.98, 0.4),
-    (0.92, 0.91, 0.66),
-    (0.77, 0.38, 0.34),
-    (0.9, 0.37, 0.1),
-    (0.2, 0.62, 0.9),
-    (0.22, 0.65, 0.64),
-    (0.14, 0.94, 0.8),
-    (0.34, 0.31, 0.68),
-    (0.59, 0.28, 0.74),
-    (0.46, 0.19, 0.94),
-    (0.37, 0.93, 0.7),
-    (0.56, 0.86, 0.55),
-    (0.67, 0.69, 0.44),
-]
-_N_COLORS = len(_UNIQUE_COLORS)
-_CMAP = LinearSegmentedColormap.from_list("ch_colors", _UNIQUE_COLORS, N=_N_COLORS)
 
 
 class ComboBox(QComboBox):

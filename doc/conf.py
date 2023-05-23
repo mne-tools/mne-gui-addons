@@ -76,6 +76,7 @@ numpydoc_xref_ignore = {
     # not documented
     "IntracranialElectrodeLocator",
     "VolSourceEstimateViewer",
+    "VolumeSegmenter",
 }
 numpydoc_validate = True
 numpydoc_validation_checks = {
