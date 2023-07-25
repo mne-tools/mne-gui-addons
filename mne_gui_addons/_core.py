@@ -330,8 +330,7 @@ class SliceBrowser(QMainWindow):
                 np.where(self._base_data < np.quantile(self._base_data, 0.95), 0, 1),
                 [1],
             )[0]
-            # marching cubes transposes dimensions so flip
-            rr = apply_trans(self._vox_ras_t, rr[:, ::-1])
+            rr = apply_trans(self._vox_ras_t, rr)
             self._renderer.mesh(
                 *rr.T,
                 triangles=tris,
