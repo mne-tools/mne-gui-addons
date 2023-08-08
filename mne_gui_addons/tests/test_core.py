@@ -21,7 +21,7 @@ subjects_dir = data_path / "subjects"
 def test_slice_browser_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the slice browser GUI."""
     nib = pytest.importorskip("nibabel")
-    from mne.gui._core import SliceBrowser
+    from mne_gui_addons._core import SliceBrowser
 
     with pytest.raises(ValueError, match="Base image is not aligned to MRI"):
         SliceBrowser(
@@ -37,7 +37,7 @@ def test_slice_browser_io(renderer_interactive_pyvistaqt):
 def test_slice_browser_display(renderer_interactive_pyvistaqt):
     """Test that the slice browser GUI displays properly."""
     pytest.importorskip("nibabel")
-    from mne.gui._core import SliceBrowser
+    from mne_gui_addons._core import SliceBrowser
 
     # test no seghead, fsaverage doesn't have seghead
     with pytest.warns(RuntimeWarning, match="`seghead` not found"):

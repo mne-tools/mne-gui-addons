@@ -3,7 +3,6 @@ import os
 import sys
 
 import pyvista
-import mne
 import mne_gui_addons
 
 faulthandler.enable()
@@ -108,7 +107,7 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "min_reported_time": 1.0,
     "abort_on_example_error": False,
-    "image_scrapers": ("matplotlib", mne.gui._GUIScraper(), "pyvista"),
+    "image_scrapers": ("matplotlib", mne_gui_addons._GUIScraper(), "pyvista"),
     "show_memory": not sys.platform.startswith(("win", "darwin")),
     "line_numbers": False,  # messes with style
     "capture_repr": ("_repr_html_",),

@@ -337,10 +337,11 @@ class SliceBrowser(QMainWindow):
                 np.where(self._base_data < np.quantile(self._base_data, 0.95), 0, 1),
                 [1],
             )[0]
-            # marching cubes transposes dimensions so flip
-            rr = apply_trans(self._vox_ras_t, rr[:, ::-1]) / 1000
-            self._head = dict(rr=rr, tris=tris)
 
+            rr = apply_trans(self._vox_ras_t, rr)
+            self._head["rr"] = rr
+            self._head["tris"] = tris
+       
         self._head_actor, _ = self._renderer.mesh(
             *self._head["rr"].T * 1000,
             triangles=self._head["tris"],
@@ -349,7 +350,7 @@ class SliceBrowser(QMainWindow):
             reset_camera=False,
             render=False,
         )
-
+        self._renderer.set_camera(focalpoint=self._head["rr"].mean(axis=0))
         if self._lh is not None and self._rh is not None:
             self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
