@@ -30,7 +30,7 @@ from mne.defaults import DEFAULTS
 from mne.evoked import EvokedArray
 from mne.time_frequency import EpochsTFR
 from mne.io.constants import FIFF
-from mne.io.pick import _get_channel_types, _picks_to_idx, _pick_inst
+from mne.io.pick import _picks_to_idx
 from mne.transforms import apply_trans
 from mne.utils import (
     _require_version,
@@ -743,7 +743,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             hbox.addWidget(QLabel("Topo Data="))
             self._data_type_selector = QComboBox()
             self._data_type_selector.addItems(
-                _get_channel_types(self._inst.info, picks="data", unique=True)
+                self._inst.info.get_channel_types(picks="data", unique=True)
             )
             self._data_type_selector.currentTextChanged.connect(self._update_data_type)
             self._data_type_selector.setSizeAdjustPolicy(QComboBox.AdjustToContents)
@@ -874,7 +874,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 copy=False,
             )
 
-        info = _pick_inst(self._inst, dtype, "bads").info
+        info = self._inst.pick(dtype, exclude="bads").info
         ave = EvokedArray(evo_data, info, tmin=self._inst.times[0])
 
         ave_max = evo_data.max()
