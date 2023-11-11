@@ -44,6 +44,7 @@ from mne.viz.backends._utils import _qt_safe_window
 
 _IMG_LABELS = [["I", "P"], ["I", "L"], ["P", "L"]]
 _ZOOM_STEP_SIZE = 5
+_ZOOM_BORDER = 1 / 5
 
 
 @verbose
@@ -424,13 +425,13 @@ class SliceBrowser(QMainWindow):
             ymid = (ymin + ymax) / 2
             if sign >= 0:  # may need to shift if zooming in or clicking
                 xedge = min([xmax - xcur, xcur - xmin])
-                if xedge < (xmax - xmin) / 3:
-                    xmid += np.sign(xcur - xmid) * ((xmax - xmin) / 3 - xedge)
+                if xedge < (xmax - xmin) * _ZOOM_BORDER:
+                    xmid += np.sign(xcur - xmid) * ((xmax - xmin) * _ZOOM_BORDER - xedge)
                 if xcur < xmin or xcur > xmax:  # out of view, reset
                     xmid = xcur
                 yedge = min([ymax - ycur, ycur - ymin])
-                if yedge < (ymax - ymin) / 3:
-                    ymid += np.sign(ycur - ymid) * ((ymax - ymin) / 3 - yedge)
+                if yedge < (ymax - ymin) * _ZOOM_BORDER:
+                    ymid += np.sign(ycur - ymid) * ((ymax - ymin) * _ZOOM_BORDER - yedge)
                 if ycur < ymin or ycur > ymax:  # out of view, reset
                     ymid = ycur
 
