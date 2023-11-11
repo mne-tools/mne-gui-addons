@@ -426,12 +426,16 @@ class SliceBrowser(QMainWindow):
             if sign >= 0:  # may need to shift if zooming in or clicking
                 xedge = min([xmax - xcur, xcur - xmin])
                 if xedge < (xmax - xmin) * _ZOOM_BORDER:
-                    xmid += np.sign(xcur - xmid) * ((xmax - xmin) * _ZOOM_BORDER - xedge)
+                    xmid += np.sign(xcur - xmid) * (
+                        (xmax - xmin) * _ZOOM_BORDER - xedge
+                    )
                 if xcur < xmin or xcur > xmax:  # out of view, reset
                     xmid = xcur
                 yedge = min([ymax - ycur, ycur - ymin])
                 if yedge < (ymax - ymin) * _ZOOM_BORDER:
-                    ymid += np.sign(ycur - ymid) * ((ymax - ymin) * _ZOOM_BORDER - yedge)
+                    ymid += np.sign(ycur - ymid) * (
+                        (ymax - ymin) * _ZOOM_BORDER - yedge
+                    )
                 if ycur < ymin or ycur > ymax:  # out of view, reset
                     ymid = ycur
 
