@@ -413,7 +413,7 @@ class SliceBrowser(QMainWindow):
 
     def _zoom(self, sign=1, draw=False):
         """Zoom in on the image."""
-        delta = _ZOOM_STEP_SIZE * -(sign < 0)  # negative if zooming out
+        delta = _ZOOM_STEP_SIZE * sign
         for axis, fig in enumerate(self._figs):
             xcur = self._images["cursor_v"][axis].get_xdata()[0]
             ycur = self._images["cursor_h"][axis].get_ydata()[0]
@@ -423,12 +423,12 @@ class SliceBrowser(QMainWindow):
             xmid = (xmin + xmax) / 2
             ymid = (ymin + ymax) / 2
             if sign >= 0:  # may need to shift if zooming in or clicking
-                if abs(xmid - xcur) > delta / 2 * rx:
-                    xmid += delta * np.sign(xcur - xmid) * rx
+                if min([xmax - xcur, xcur - xmin]) < (xmax - xmin) / 3:
+                    xmid += (xcur - xmid) / 6
                 if xcur < xmin or xcur > xmax:  # out of view, reset
                     xmid = xcur
-                if abs(ymid - ycur) > delta / 2 * ry:
-                    ymid += delta * np.sign(ycur - ymid) * ry
+                if min([ymax - ycur, ycur - ymin]) < (ymax - ymin) / 3:
+                    ymid += (ycur - ymid) / 6
                 if ycur < ymin or ycur > ymax:  # out of view, reset
                     ymid = ycur
 
@@ -618,7 +618,6 @@ class SliceBrowser(QMainWindow):
         """Move to view on MRI and CT on click."""
         if event.inaxes is self._figs[axis].axes[0]:
             # Data coordinates are voxel coordinates
-            print(event, axis)
             pos = (event.xdata, event.ydata)
             logger.debug(f'Clicked {"XYZ"[axis]} ({axis}) axis at pos {pos}')
             xyz = self._vox
