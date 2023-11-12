@@ -553,8 +553,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._update_group()
         if not np.isnan(self._chs[name]).any():
             self._set_ras(self._chs[name])
+            self._zoom(sign=0, draw=True)
             self._update_camera(render=True)
-            self._draw()
 
     def _go_to_ch(self, index):
         """Change current channel to the item selected."""

@@ -44,6 +44,7 @@ from mne.viz.backends._utils import _qt_safe_window
 
 _IMG_LABELS = [["I", "P"], ["I", "L"], ["P", "L"]]
 _ZOOM_STEP_SIZE = 5
+_ZOOM_BORDER = 1 / 5
 
 
 @verbose
@@ -422,11 +423,22 @@ class SliceBrowser(QMainWindow):
             ymin, ymax = fig.axes[0].get_ylim()
             xmid = (xmin + xmax) / 2
             ymid = (ymin + ymax) / 2
-            if sign == 1:  # may need to shift if zooming in
-                if abs(xmid - xcur) > delta / 2 * rx:
-                    xmid += delta * np.sign(xcur - xmid) * rx
-                if abs(ymid - ycur) > delta / 2 * ry:
-                    ymid += delta * np.sign(ycur - ymid) * ry
+            if sign >= 0:  # may need to shift if zooming in or clicking
+                xedge = min([xmax - xcur, xcur - xmin])
+                if xedge < (xmax - xmin) * _ZOOM_BORDER:
+                    xmid += np.sign(xcur - xmid) * (
+                        (xmax - xmin) * _ZOOM_BORDER - xedge
+                    )
+                if xcur < xmin or xcur > xmax:  # out of view, reset
+                    xmid = xcur
+                yedge = min([ymax - ycur, ycur - ymin])
+                if yedge < (ymax - ymin) * _ZOOM_BORDER:
+                    ymid += np.sign(ycur - ymid) * (
+                        (ymax - ymin) * _ZOOM_BORDER - yedge
+                    )
+                if ycur < ymin or ycur > ymax:  # out of view, reset
+                    ymid = ycur
+
             xwidth = (xmax - xmin) / 2 - delta * rx
             ywidth = (ymax - ymin) / 2 - delta * ry
             if xwidth <= 0 or ywidth <= 0:
@@ -620,6 +632,7 @@ class SliceBrowser(QMainWindow):
             logger.debug(f"Using voxel  {list(xyz)}")
             ras = apply_trans(self._vox_ras_t, xyz)
             self._set_ras(ras)
+            self._zoom(sign=0, draw=True)
 
     def _update_moved(self):
         """Update when cursor position changes."""
