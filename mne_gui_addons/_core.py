@@ -508,12 +508,12 @@ class SliceBrowser(QMainWindow):
         msg = ", ".join(f"{x:0.2f}" for x in ras)
         logger.debug(f"Trying RAS:  ({msg}) mm")
         # clip to valid
-        vox = apply_trans(self._ras_vox_t, ras)
+        vox = apply_trans(self._scan_ras_vox_t, ras)
         vox = np.array(
             [np.clip(d, 0, self._voxel_sizes[ii] - 1) for ii, d in enumerate(vox)]
         )
         # transform back, make write-only
-        self._ras_safe = apply_trans(self._vox_ras_t, vox)
+        self._ras_safe = apply_trans(self._vox_scan_ras_t, vox)
         self._ras_safe.flags["WRITEABLE"] = False
         msg = ", ".join(f"{x:0.2f}" for x in self._ras_safe)
         logger.debug(f"Setting RAS: ({msg}) mm")
@@ -528,7 +528,7 @@ class SliceBrowser(QMainWindow):
         vox : array-like
             The voxel coordinate.
         """
-        self._set_ras(apply_trans(self._vox_ras_t, vox))
+        self._set_ras(apply_trans(self._vox_scan_ras_t, vox))
 
     @property
     def _vox(self):
