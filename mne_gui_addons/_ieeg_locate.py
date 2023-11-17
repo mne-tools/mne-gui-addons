@@ -6,7 +6,6 @@
 # License: BSD (3-clause)
 
 import numpy as np
-import platform
 
 from scipy.ndimage import maximum_filter
 
