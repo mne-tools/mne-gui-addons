@@ -1309,9 +1309,12 @@ class VolSourceEstimateViewer(SliceBrowser):
             label_str = "{:.3e}"
         elif np.issubdtype(self._stc_img.dtype, np.integer):
             label_str = "{:d}"
+        coord = self._get_src_coord()
         self._intensity_label.setText(
             ("intensity = " + label_str).format(
-                self._stc_img[tuple(self._get_src_coord())]
+                self._stc_img[coord]
+                if all([coord[i] < self._stc_img.shape[i] for i in range(3)])
+                else np.nan
             )
         )
 

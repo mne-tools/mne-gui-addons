@@ -642,7 +642,9 @@ class SliceBrowser(QMainWindow):
     def _update_moved(self):
         """Update when cursor position changes."""
         self._RAS_textbox.setText("{:.2f}, {:.2f}, {:.2f}".format(*self._ras))
-        self._VOX_textbox.setText("{:3d}, {:3d}, {:3d}".format(*self._current_slice))
+        self._VOX_textbox.setText(
+            "{:3d}, {:3d}, {:3d}".format(*self._vox.round().astype(int))
+        )
         self._intensity_label.setText(
             "intensity = {:.2f}".format(self._base_data[tuple(self._current_slice)])
         )
