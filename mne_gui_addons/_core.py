@@ -402,8 +402,6 @@ class SliceBrowser(QMainWindow):
     def _update_camera(self, render=False):
         """Update the camera position."""
         self._renderer.set_camera(
-            # needs fix, distance moves when focal point updates
-            distance=self._renderer.plotter.camera.distance * 0.9,
             focalpoint=tuple(self._ras),
             reset_camera=False,
         )
