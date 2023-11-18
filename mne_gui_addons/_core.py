@@ -204,7 +204,9 @@ class SliceBrowser(QMainWindow):
 
         self._ras_vox_t = np.linalg.inv(self._vox_ras_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
-        self._scan_ras_ras_vox_t = np.linalg.inv(self._ras_vox_scan_ras_t)  # to RAS voxels
+        self._scan_ras_ras_vox_t = np.linalg.inv(
+            self._ras_vox_scan_ras_t
+        )  # to RAS voxels
         self._scan_ras_ras_t = np.dot(self._vox_ras_t, self._scan_ras_vox_t)
         self._ras_scan_ras_t = np.dot(self._vox_scan_ras_t, self._ras_vox_t)
         self._voxel_sizes = np.array(self._base_data.shape)
@@ -630,9 +632,9 @@ class SliceBrowser(QMainWindow):
             # Data coordinates are voxel coordinates
             pos = (event.xdata, event.ydata)
             logger.debug(f'Clicked {"XYZ"[axis]} ({axis}) axis at pos {pos}')
-            xyz = self._vox
+            xyz = apply_trans(self._scan_ras_ras_vox_t, self._ras)
             xyz[list(self._xy_idx[axis])] = pos
-            logger.debug(f"Using voxel  {list(xyz)}")
+            logger.debug(f"Using RAS voxel  {list(xyz)}")
             ras = apply_trans(self._ras_vox_scan_ras_t, xyz)
             self._set_ras(ras)
             self._zoom(sign=0, draw=True)

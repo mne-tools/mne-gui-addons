@@ -294,9 +294,9 @@ class VolSourceEstimateViewer(SliceBrowser):
         self._images["stc"] = list()
         src_shape = np.array(self._src_lut.shape)
         corners = [  # center pixel on location
-            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_vox_t),
+            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t),
             _coord_to_coord(
-                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_vox_t
+                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
             ),
         ]
         src_coord = self._get_src_coord()
@@ -404,13 +404,7 @@ class VolSourceEstimateViewer(SliceBrowser):
     def _get_src_coord(self):
         """Get the current slice transformed to source space."""
         return tuple(
-            np.round(
-                _coord_to_coord(
-                    self._current_slice,
-                    self._ras_vox_scan_ras_t,
-                    self._src_scan_ras_vox_t,
-                )
-            ).astype(int)
+            np.round(apply_trans(self._src_scan_ras_vox_t, self._ras)).astype(int)
         )
 
     def _update_stc_pick(self):
