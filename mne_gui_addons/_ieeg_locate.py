@@ -228,7 +228,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
             # to bottom-left corner centered (all coords positive).
             if np.isnan(surf_ras).any():
                 continue
-            xyz = apply_trans(self._ras_vox_t, surf_ras)
+            xyz = apply_trans(
+                self._scan_ras_ras_vox_t, apply_trans(self._ras_scan_ras_t, surf_ras)
+            )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
             if proj or dist < self._radius:

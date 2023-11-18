@@ -406,7 +406,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         return tuple(
             np.round(
                 _coord_to_coord(
-                    self._current_slice, self._vox_scan_ras_t, self._src_scan_ras_vox_t
+                    self._current_slice, self._ras_vox_scan_ras_t, self._src_scan_ras_vox_t
                 )
             ).astype(int)
         )
@@ -1278,7 +1278,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         max_coord_mri = _coord_to_coord(
             max_coord, self._src_vox_scan_ras_t, self._scan_ras_vox_t
         )
-        self._set_ras(apply_trans(self._vox_ras_t, max_coord_mri))
+        self._set_ras(apply_trans(self._vox_scan_ras_t, max_coord_mri))
 
     def _plot_data(self, draw=True):
         """Update which coordinate's data is being shown."""

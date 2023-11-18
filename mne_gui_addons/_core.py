@@ -440,14 +440,10 @@ class SliceBrowser(QMainWindow):
             if sign >= 0:  # may need to shift if zooming in or clicking
                 xedge = min([xmid + xwidth - xcur, xcur - xmid + xwidth])
                 if xedge < 2 * xwidth * _ZOOM_BORDER:
-                    xmid += np.sign(xcur - xmid) * (
-                        2 * xwidth * _ZOOM_BORDER - xedge
-                    )
+                    xmid += np.sign(xcur - xmid) * (2 * xwidth * _ZOOM_BORDER - xedge)
                 yedge = min([ymid + ywidth - ycur, ycur - ymid + ywidth])
                 if yedge < 2 * ywidth * _ZOOM_BORDER:
-                    ymid += np.sign(ycur - ymid) * (
-                        2 * ywidth * _ZOOM_BORDER - yedge
-                    )
+                    ymid += np.sign(ycur - ymid) * (2 * ywidth * _ZOOM_BORDER - yedge)
 
             fig.axes[0].set_xlim(xmid - xwidth, xmid + xwidth)
             fig.axes[0].set_ylim(ymid - ywidth, ymid + ywidth)
@@ -542,7 +538,7 @@ class SliceBrowser(QMainWindow):
 
     @property
     def _current_slice(self):
-        return self._vox.round().astype(int)
+        return apply_trans(self._scan_ras_ras_vox_t, self._ras).round().astype(int)
 
     def _draw(self, axis=None):
         """Update the figures with a draw call."""
