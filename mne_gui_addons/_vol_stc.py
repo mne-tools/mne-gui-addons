@@ -406,7 +406,9 @@ class VolSourceEstimateViewer(SliceBrowser):
         return tuple(
             np.round(
                 _coord_to_coord(
-                    self._current_slice, self._ras_vox_scan_ras_t, self._src_scan_ras_vox_t
+                    self._current_slice,
+                    self._ras_vox_scan_ras_t,
+                    self._src_scan_ras_vox_t,
                 )
             ).astype(int)
         )
