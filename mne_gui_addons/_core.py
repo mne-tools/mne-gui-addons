@@ -204,7 +204,7 @@ class SliceBrowser(QMainWindow):
 
         self._ras_vox_t = np.linalg.inv(self._vox_ras_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
-        self._scan_ras_ras_vox_t = np.linalg.inv(ras_vox_scan_ras_t)  # to RAS voxels
+        self._scan_ras_ras_vox_t = np.linalg.inv(self._ras_vox_scan_ras_t)  # to RAS voxels
         self._scan_ras_ras_t = np.dot(self._vox_ras_t, self._scan_ras_vox_t)
         self._ras_scan_ras_t = np.dot(self._vox_scan_ras_t, self._ras_vox_t)
         self._voxel_sizes = np.array(self._base_data.shape)

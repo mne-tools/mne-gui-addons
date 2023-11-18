@@ -1277,10 +1277,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._freq_slider.setValue(f_idx)
         self._time_slider.setValue(t_idx)
         max_coord = np.array(np.where(self._src_lut == stc_idx)).flatten()
-        max_coord_mri = _coord_to_coord(
-            max_coord, self._src_vox_scan_ras_t, self._scan_ras_vox_t
-        )
-        self._set_ras(apply_trans(self._vox_scan_ras_t, max_coord_mri))
+        self._set_ras(apply_trans(self._src_vox_scan_ras_t, max_coord))
 
     def _plot_data(self, draw=True):
         """Update which coordinate's data is being shown."""
