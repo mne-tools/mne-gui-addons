@@ -294,7 +294,9 @@ class VolSourceEstimateViewer(SliceBrowser):
         self._images["stc"] = list()
         src_shape = np.array(self._src_lut.shape)
         corners = [  # center pixel on location
-            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t),
+            _coord_to_coord(
+                (0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
+            ),
             _coord_to_coord(
                 src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
             ),
