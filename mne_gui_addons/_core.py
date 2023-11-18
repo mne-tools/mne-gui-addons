@@ -429,28 +429,26 @@ class SliceBrowser(QMainWindow):
             rx, ry = [self._voxel_ratios[idx] for idx in self._xy_idx[axis]]
             xmin, xmax = fig.axes[0].get_xlim()
             ymin, ymax = fig.axes[0].get_ylim()
-            xmid = (xmin + xmax) / 2
-            ymid = (ymin + ymax) / 2
-            if sign >= 0:  # may need to shift if zooming in or clicking
-                xedge = min([xmax - xcur, xcur - xmin])
-                if xedge < (xmax - xmin) * _ZOOM_BORDER:
-                    xmid += np.sign(xcur - xmid) * (
-                        (xmax - xmin) * _ZOOM_BORDER - xedge
-                    )
-                if xmid < xmin or xmid > xmax:  # out of view, reset
-                    xmid = xcur
-                yedge = min([ymax - ycur, ycur - ymin])
-                if yedge < (ymax - ymin) * _ZOOM_BORDER:
-                    ymid += np.sign(ycur - ymid) * (
-                        (ymax - ymin) * _ZOOM_BORDER - yedge
-                    )
-                if ymid < ymin or ymid > ymax:  # out of view, reset
-                    ymid = ycur
 
             xwidth = (xmax - xmin) / 2 - delta * rx
             ywidth = (ymax - ymin) / 2 - delta * ry
             if xwidth <= 0 or ywidth <= 0:
                 return
+
+            xmid = (xmin + xmax) / 2
+            ymid = (ymin + ymax) / 2
+            if sign >= 0:  # may need to shift if zooming in or clicking
+                xedge = min([xmid + xwidth - xcur, xcur - xmid + xwidth])
+                if xedge < 2 * xwidth * _ZOOM_BORDER:
+                    xmid += np.sign(xcur - xmid) * (
+                        2 * xwidth * _ZOOM_BORDER - xedge
+                    )
+                yedge = min([ymid + ywidth - ycur, ycur - ymid + ywidth])
+                if yedge < 2 * ywidth * _ZOOM_BORDER:
+                    ymid += np.sign(ycur - ymid) * (
+                        2 * ywidth * _ZOOM_BORDER - yedge
+                    )
+
             fig.axes[0].set_xlim(xmid - xwidth, xmid + xwidth)
             fig.axes[0].set_ylim(ymid - ywidth, ymid + ywidth)
             if draw:
