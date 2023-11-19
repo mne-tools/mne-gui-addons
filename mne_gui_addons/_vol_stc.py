@@ -294,9 +294,11 @@ class VolSourceEstimateViewer(SliceBrowser):
         self._images["stc"] = list()
         src_shape = np.array(self._src_lut.shape)
         corners = [  # center pixel on location
-            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_vox_t),
             _coord_to_coord(
-                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_vox_t
+                (0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
+            ),
+            _coord_to_coord(
+                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
             ),
         ]
         src_coord = self._get_src_coord()
@@ -404,11 +406,7 @@ class VolSourceEstimateViewer(SliceBrowser):
     def _get_src_coord(self):
         """Get the current slice transformed to source space."""
         return tuple(
-            np.round(
-                _coord_to_coord(
-                    self._current_slice, self._vox_scan_ras_t, self._src_scan_ras_vox_t
-                )
-            ).astype(int)
+            np.round(apply_trans(self._src_scan_ras_vox_t, self._ras)).astype(int)
         )
 
     def _update_stc_pick(self):
@@ -1275,10 +1273,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._freq_slider.setValue(f_idx)
         self._time_slider.setValue(t_idx)
         max_coord = np.array(np.where(self._src_lut == stc_idx)).flatten()
-        max_coord_mri = _coord_to_coord(
-            max_coord, self._src_vox_scan_ras_t, self._scan_ras_vox_t
-        )
-        self._set_ras(apply_trans(self._vox_ras_t, max_coord_mri))
+        self._set_ras(apply_trans(self._src_vox_scan_ras_t, max_coord))
 
     def _plot_data(self, draw=True):
         """Update which coordinate's data is being shown."""
@@ -1314,9 +1309,12 @@ class VolSourceEstimateViewer(SliceBrowser):
             label_str = "{:.3e}"
         elif np.issubdtype(self._stc_img.dtype, np.integer):
             label_str = "{:d}"
+        coord = self._get_src_coord()
         self._intensity_label.setText(
             ("intensity = " + label_str).format(
-                self._stc_img[tuple(self._get_src_coord())]
+                self._stc_img[coord]
+                if all([coord[i] < self._stc_img.shape[i] for i in range(3)])
+                else np.nan
             )
         )
 

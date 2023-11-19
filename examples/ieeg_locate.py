@@ -43,6 +43,7 @@ from dipy.align import resample
 import mne
 import mne_gui_addons as mne_gui
 from mne.datasets import fetch_fsaverage
+import mne_bids
 
 # paths to mne datasets: sample sEEG and FreeSurfer's fsaverage subject,
 # which is in MNI space
@@ -383,6 +384,34 @@ mne_gui.locate_ieeg(
     subjects_dir=misc_path / "seeg",
 )
 # The `raw` object is modified to contain the channel locations
+
+# %%
+# In a real case, we would not already have contact locations. We would have
+# to click through the slices to find spots of hyperintensity and associate
+# those with channel names from the recording. If we have surgical plans for
+# where these contacts were targeted, we can try to do this contact detection
+# and association automatically. Here, we will fake the surgical plans using
+# the locations that have already been found but, in practice, you would enter
+# these manually from the planning documentation.
+
+montage = raw.get_montage()
+montage.apply_trans(subj_trans)  # convert to surface RAS
+# convert to scanner RAS
+mne_bids.convert_montage_to_ras(montage, subject='sample_seeg', subjects_dir=misc_path / "seeg")
+
+raw.set_montage(None)  # clear already found montage
+# fake surgical plans from already-found contact locations
+targets = {''.join([letter for letter in ch if not letter.isdigit()]): pos
+           for ch, pos in montage.get_positions()['ch_pos'].items()
+           if [letter for letter in ch if letter.isdigit()] == ['1']}
+mne_gui.locate_ieeg(
+    raw.info,
+    subj_trans,
+    CT_aligned,
+    subject="sample_seeg",
+    subjects_dir=misc_path / "seeg",
+    targets=targets
+)
 
 # %%
 # Let's do a quick sidebar and show what this looks like for ECoG as well.
