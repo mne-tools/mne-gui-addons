@@ -229,7 +229,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             if np.isnan(surf_ras).any():
                 continue
             xyz = apply_trans(
-                self._scan_ras_ras_vox_t, apply_trans(self._ras_scan_ras_t, surf_ras)
+                self._scan_ras_ras_vox_t, apply_trans(self._mri_scan_ras_t, surf_ras)
             )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
@@ -559,7 +559,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
         if not np.isnan(self._chs[name]).any():
-            self._set_ras(apply_trans(self._ras_scan_ras_t, self._chs[name]))
+            self._set_ras(apply_trans(self._mri_scan_ras_t, self._chs[name]))
             self._zoom(sign=0, draw=True)
             self._update_camera(render=True)
 

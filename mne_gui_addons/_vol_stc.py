@@ -349,8 +349,8 @@ class VolSourceEstimateViewer(SliceBrowser):
         # TO DO: add surface source space viewing as elif
         if any([this_src["type"] == "vol" for this_src in self._src]):
             scalars = np.array(np.where(np.isnan(self._stc_img), 0, 1.0))
-            spacing = np.diag(self._src_vox_ras_t)[:3]
-            origin = self._src_vox_ras_t[:3, 3] - spacing / 2.0
+            spacing = np.diag(self._src_vox_mri_t)[:3]
+            origin = self._src_vox_mri_t[:3, 3] - spacing / 2.0
             center = 0.5 * self._stc_range - self._stc_min
             (
                 self._grid,
