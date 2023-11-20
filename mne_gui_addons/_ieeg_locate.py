@@ -140,7 +140,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # set current position as current contact location if exists
         if not np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
-            self._set_ras(self._chs[self._ch_names[self._ch_index]], update_plots=False)
+            self._set_ras(
+                apply_trans(
+                    self._ras_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
+                ),
+                update_plots=False,
+            )
 
         # add plots of contacts on top
         self._plot_ch_images()
@@ -218,12 +223,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ch_image[-(ey + ii[idx[1]]), ex + ii[idx[0]]] = group
             return ch_image
 
-        for name, ras in self._chs.items():
+        for name, surf_ras in self._chs.items():
             # move from middle-centered (half coords positive, half negative)
             # to bottom-left corner centered (all coords positive).
-            if np.isnan(ras).any():
+            if np.isnan(surf_ras).any():
                 continue
-            xyz = apply_trans(self._ras_vox_t, ras)
+            xyz = apply_trans(
+                self._scan_ras_ras_vox_t, apply_trans(self._ras_scan_ras_t, surf_ras)
+            )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
             if proj or dist < self._radius:
@@ -552,7 +559,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
         if not np.isnan(self._chs[name]).any():
-            self._set_ras(self._chs[name])
+            self._set_ras(apply_trans(self._ras_scan_ras_t, self._chs[name]))
             self._zoom(sign=0, draw=True)
             self._update_camera(render=True)
 
@@ -617,7 +624,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._ch_index if ch is None else self._ch_names.index(ch)
         ]
         if self._snap_button.text() == "Off":
-            self._chs[name][:] = self._ras
+            self._chs[name][:] = apply_trans(
+                self._scan_ras_ras_t, self._ras
+            )  # stored as surface RAS
         else:
             shape = np.mean(self._voxel_sizes)  # Freesurfer shape (256)
             voxels_max = int(
