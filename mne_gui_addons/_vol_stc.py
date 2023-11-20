@@ -241,7 +241,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         (
             self._src_lut,
             self._src_vox_scan_ras_t,
-            self._src_vox_ras_t,
+            self._src_vox_mri_t,
             self._src_rr,
         ) = _get_src_lut(src)
         self._src_scan_ras_vox_t = np.linalg.inv(self._src_vox_scan_ras_t)
