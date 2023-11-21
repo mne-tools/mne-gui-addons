@@ -66,10 +66,10 @@ def _load_image(img, verbose=None):
     img_data = nib.orientations.apply_orientation(orig_data, ornt_trans)
     orig_mgh = nib.MGHImage(orig_data, img.affine)
     vox_scan_ras_t = orig_mgh.header.get_vox2ras()
-    vox_ras_t = orig_mgh.header.get_vox2ras_tkr()
+    vox_mri_t = orig_mgh.header.get_vox2ras_tkr()
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
     ras_vox_scan_ras_t = np.dot(vox_scan_ras_t, aff_trans)
-    return img_data, vox_ras_t, vox_scan_ras_t, ras_vox_scan_ras_t
+    return img_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t
 
 
 def _make_mpl_plot(
@@ -170,7 +170,7 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, vox_ras_t, vox_scan_ras_t, ras_vox_scan_ras_t = _load_image(
+            self._mri_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t = _load_image(
                 op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
             )
 
@@ -178,13 +178,13 @@ class SliceBrowser(QMainWindow):
         if base_image is None:
             assert self._mri_data is not None
             self._base_data = self._mri_data
-            self._vox_ras_t = vox_ras_t
+            self._vox_mri_t = vox_mri_t
             self._vox_scan_ras_t = vox_scan_ras_t
             self._ras_vox_scan_ras_t = ras_vox_scan_ras_t
         else:
             (
                 self._base_data,
-                self._vox_ras_t,
+                self._vox_mri_t,
                 self._vox_scan_ras_t,
                 self._ras_vox_scan_ras_t,
             ) = _load_image(base_image)
@@ -202,13 +202,13 @@ class SliceBrowser(QMainWindow):
                         "``subject`` and ``subjects_dir`` arguments"
                     )
 
-        self._ras_vox_t = np.linalg.inv(self._vox_ras_t)
+        self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
         self._scan_ras_ras_vox_t = np.linalg.inv(
             self._ras_vox_scan_ras_t
         )  # to RAS voxels
-        self._scan_ras_ras_t = np.dot(self._vox_ras_t, self._scan_ras_vox_t)
-        self._ras_scan_ras_t = np.dot(self._vox_scan_ras_t, self._ras_vox_t)
+        self._scan_ras_mri_t = np.dot(self._vox_mri_t, self._scan_ras_vox_t)
+        self._mri_scan_ras_t = np.dot(self._vox_scan_ras_t, self._mri_vox_t)
         self._voxel_sizes = np.array(self._base_data.shape)
         self._voxel_ratios = self._voxel_sizes / self._voxel_sizes.min()
 
@@ -341,7 +341,7 @@ class SliceBrowser(QMainWindow):
                 np.where(self._base_data < np.quantile(self._base_data, 0.95), 0, 1),
                 [1],
             )[0]
-            rr = apply_trans(self._vox_ras_t, rr)
+            rr = apply_trans(self._vox_mri_t, rr)
             self._renderer.mesh(
                 *rr.T,
                 triangles=tris,

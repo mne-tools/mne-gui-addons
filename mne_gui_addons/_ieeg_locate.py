@@ -142,7 +142,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if not np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
             self._set_ras(
                 apply_trans(
-                    self._ras_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
+                    self._mri_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
                 ),
                 update_plots=False,
             )
@@ -229,7 +229,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             if np.isnan(surf_ras).any():
                 continue
             xyz = apply_trans(
-                self._scan_ras_ras_vox_t, apply_trans(self._ras_scan_ras_t, surf_ras)
+                self._scan_ras_ras_vox_t, apply_trans(self._mri_scan_ras_t, surf_ras)
             )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
@@ -515,9 +515,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )[0]
         if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
             # add 2D lines on each slice plot if in max intensity projection
-            target_vox = apply_trans(self._ras_vox_t, pos[target_idx])
+            target_vox = apply_trans(
+                self._mri_scan_ras_t,
+                apply_trans(self._scan_ras_ras_vox_t, pos[target_idx]),
+            )
             insert_vox = apply_trans(
-                self._ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                self._mri_scan_ras_t,
+                apply_trans(
+                    self._scan_ras_ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                ),
             )
             lines_2D = list()
             for axis in range(3):
@@ -559,7 +565,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
         if not np.isnan(self._chs[name]).any():
-            self._set_ras(apply_trans(self._ras_scan_ras_t, self._chs[name]))
+            self._set_ras(apply_trans(self._mri_scan_ras_t, self._chs[name]))
             self._zoom(sign=0, draw=True)
             self._update_camera(render=True)
 
@@ -625,7 +631,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         ]
         if self._snap_button.text() == "Off":
             self._chs[name][:] = apply_trans(
-                self._scan_ras_ras_t, self._ras
+                self._scan_ras_mri_t, self._ras
             )  # stored as surface RAS
         else:
             shape = np.mean(self._voxel_sizes)  # Freesurfer shape (256)
@@ -640,7 +646,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 use_relative=True,
             )
             self._chs[name][:] = apply_trans(  # to surface RAS
-                self._vox_ras_t, np.array(list(neighbors)).mean(axis=0)
+                self._vox_mri_t, np.array(list(neighbors)).mean(axis=0)
             )
         self._color_list_item()
         self._update_lines(self._groups[name])
