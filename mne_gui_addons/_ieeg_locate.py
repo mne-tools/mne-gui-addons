@@ -35,7 +35,7 @@ from mne.utils import logger, _validate_type, verbose, warn
 from mne import pick_types
 
 _CH_PLOT_SIZE = 1024
-_DEFAULT_RADIUS = 5
+_DEFAULT_RADIUS = 2
 _RADIUS_SCALAR = 0.4
 _TUBE_SCALAR = 0.1
 _BOLT_SCALAR = 30  # mm
@@ -239,12 +239,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
-            if proj or dist < self._radius:
+            if proj or dist <= self._radius:
                 group = self._groups[name]
-                r = (
-                    self._radius
-                    if proj
-                    else self._radius - np.round(abs(dist)).astype(int)
+                r = int(
+                    round(
+                        (self._radius if proj else self._radius - abs(dist))
+                        * _CH_PLOT_SIZE
+                        / self._voxel_sizes[axis]
+                    )
                 )
                 xf, yf = (xyz / vxyz)[list(self._xy_idx[axis])]
                 ch_image = color_ch_radius(ch_image, xf, yf, group, r)
@@ -489,10 +491,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _deduplicate_local_maxima(self, local_maxima):
         """De-duplicate peaks by finding center of mass of high-intensity voxels."""
         local_maxima2 = set()
-        neighbors_used = set()
         for local_max in local_maxima:
-            if tuple(local_max) in neighbors_used:
-                continue
             neighbors = _voxel_neighbors(
                 local_max,
                 self._ct_data,
@@ -500,44 +499,43 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
-            neighbors_used = neighbors_used.union(set(neighbors))
             loc = np.array(list(neighbors)).mean(axis=0)
             if (
                 not local_maxima2
                 or np.min(
                     [np.linalg.norm(np.array(loc2) - loc) for loc2 in local_maxima2]
                 )
-                > 1
+                > 2  # must be one full voxel away
             ):
                 local_maxima2.add(tuple(loc))
         return np.array([np.array(local_max) for local_max in local_maxima2])
 
-    def _find_local_maxima(self, target, check_nearest=3, max_search_radius=50):
+    def _find_local_maxima(self, target, check_nearest=5, max_search_radius=50):
         target_vox = (
             apply_trans(self._scan_ras_ras_vox_t, target * 1000).round().astype(int)
         )
         search_radius = 1
         local_maxima = None
         while local_maxima is None or local_maxima.shape[0] < check_nearest:
-            local_maxima = (
-                np.array(
-                    np.where(
-                        ~np.isnan(
-                            self._ct_maxima[
-                                tuple(
-                                    slice(
-                                        target_vox[i] - search_radius,
-                                        target_vox[i] + search_radius,
-                                    )
-                                    for i in range(3)
-                                )
-                            ]
-                        )
+            check_voxels = self._ct_maxima[
+                tuple(
+                    slice(
+                        target_vox[i] - search_radius,
+                        target_vox[i] + search_radius,
                     )
-                ).T
+                    for i in range(3)
+                )
+            ]
+            local_maxima = (
+                np.array(np.where(~np.isnan(check_voxels))).T
                 + target_vox
                 - search_radius
             )
+            local_maxima = local_maxima[
+                np.argsort(
+                    [self._ct_data[tuple(local_max)] for local_max in local_maxima]
+                )[::-1]
+            ]
             local_maxima = self._deduplicate_local_maxima(local_maxima)
             search_radius += 1
             if search_radius > max_search_radius:
@@ -589,7 +587,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         return locs
 
     def _auto_find_grid(
-        self, tv, r, check_nearest=3, max_search_radius=50, voxel_tol=2
+        self, tv, r, check_nearest=5, max_search_radius=50, voxel_tol=2
     ):
         """Automatically find a series of lines to form a grid."""
         # first, find first line of contacts
@@ -631,7 +629,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def auto_find_contacts(
         self,
         targets,
-        check_nearest=3,
+        check_nearest=5,
         max_search_radius="auto",
         voxel_tol=2,
     ):
@@ -1065,7 +1063,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             "left angle bracket/right angle bracket: anterior/posterior",
         )
 
-    def _update_ct_maxima(self, ct_thresh=0.9):
+    def _update_ct_maxima(self, ct_thresh=0.95):
         """Compute the maximum voxels based on the current radius."""
         self._ct_maxima = (
             maximum_filter(self._ct_data, (self._radius,) * 3) == self._ct_data
