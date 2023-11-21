@@ -489,7 +489,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _deduplicate_local_maxima(self, local_maxima):
         """De-duplicate peaks by finding center of mass of high-intensity voxels."""
         local_maxima2 = set()
+        neighbors_used = set()
         for local_max in local_maxima:
+            if tuple(local_max) in neighbors_used:
+                continue
             neighbors = _voxel_neighbors(
                 local_max,
                 self._ct_data,
@@ -497,6 +500,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
+            neighbors_used = neighbors_used.union(set(neighbors))
             loc = np.array(list(neighbors)).mean(axis=0)
             if (
                 not local_maxima2
@@ -694,9 +698,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     self._scan_ras_ras_vox_t, target * 1000
                 )
                 v /= np.linalg.norm(v)
-            for i, tv in enumerate(
-                local_maxima[:check_nearest]
-            ):  # try neartest sequentially
+            for i, tv in enumerate(local_maxima):  # try neartest sequentially
                 # only try entry if given, otherwise try other local maxima as direction vectors
                 for tv2 in local_maxima[i + 1 :] if entry is None else [tv + v]:
                     # find specified direction vector/direction vector to next contact
@@ -809,9 +811,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )[0]
         if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
             # add 2D lines on each slice plot if in max intensity projection
-            target_vox = apply_trans(self._ras_vox_t, pos[target_idx])
+            target_vox = apply_trans(
+                self._mri_scan_ras_t,
+                apply_trans(self._scan_ras_ras_vox_t, pos[target_idx]),
+            )
             insert_vox = apply_trans(
-                self._ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                self._mri_scan_ras_t,
+                apply_trans(
+                    self._scan_ras_ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                ),
             )
             lines_2D = list()
             for axis in range(3):
@@ -1057,14 +1065,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
             "left angle bracket/right angle bracket: anterior/posterior",
         )
 
-    def _update_ct_maxima(self, ct_quantile=0.99):
+    def _update_ct_maxima(self, ct_thresh=0.9):
         """Compute the maximum voxels based on the current radius."""
         self._ct_maxima = (
             maximum_filter(self._ct_data, (self._radius,) * 3) == self._ct_data
         )
-        self._ct_maxima[
-            self._ct_data <= np.quantile(self._ct_data, ct_quantile)
-        ] = False
+        self._ct_maxima[self._ct_data <= self._ct_data.max() * ct_thresh] = False
         if self._mri_data is not None:
             self._ct_maxima[self._mri_data == 0] = False
         self._ct_maxima = np.where(self._ct_maxima, 1, np.nan)  # transparent
