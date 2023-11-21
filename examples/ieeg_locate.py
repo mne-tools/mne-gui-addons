@@ -397,20 +397,24 @@ mne_gui.locate_ieeg(
 montage = raw.get_montage()
 montage.apply_trans(subj_trans)  # convert to surface RAS
 # convert to scanner RAS
-mne_bids.convert_montage_to_ras(montage, subject='sample_seeg', subjects_dir=misc_path / "seeg")
+mne_bids.convert_montage_to_ras(
+    montage, subject="sample_seeg", subjects_dir=misc_path / "seeg"
+)
 
 raw.set_montage(None)  # clear already found montage
 # fake surgical plans from already-found contact locations
-targets = {''.join([letter for letter in ch if not letter.isdigit()]): pos
-           for ch, pos in montage.get_positions()['ch_pos'].items()
-           if [letter for letter in ch if letter.isdigit()] == ['1']}
+targets = {
+    "".join([letter for letter in ch if not letter.isdigit()]): pos
+    for ch, pos in montage.get_positions()["ch_pos"].items()
+    if [letter for letter in ch if letter.isdigit()] == ["1"]
+}
 mne_gui.locate_ieeg(
     raw.info,
     subj_trans,
     CT_aligned,
     subject="sample_seeg",
     subjects_dir=misc_path / "seeg",
-    targets=targets
+    targets=targets,
 )
 
 # %%
@@ -442,6 +446,45 @@ mne_gui.locate_ieeg(
     CT_aligned_ecog,
     subject="sample_ecog",
     subjects_dir=misc_path / "ecog",
+)
+
+# %%
+# Similarly for ECoG, we can try to automatically detect contact locations.
+# In the case of ECoG, there can often be a lot of contacts so this can be
+# a big time saver.
+
+montage = raw_ecog.get_montage()
+montage.apply_trans(subj_trans_ecog)  # convert to surface RAS
+# convert to scanner RAS
+mne_bids.convert_montage_to_ras(
+    montage, subject="sample_ecog", subjects_dir=misc_path / "ecog"
+)
+
+raw_ecog.set_montage(None)  # clear already found montage
+# fake surgical plans from already-found contact locations
+targets = dict()
+ch_pos = montage.get_positions()["ch_pos"]
+for elec in set(
+    [
+        "".join([letter for letter in ch if not letter.isdigit()])
+        for ch in raw_ecog.ch_names
+    ]
+):
+    names = [ch for ch in raw_ecog.ch_names if ch.replace(elec, "").isdigit()]
+    ch1 = [name for name in names if name.replace(elec, "") == "1"][0]
+    ch2 = [name for name in names if name.replace(elec, "") == "2"][0]
+    targets[elec] = (
+        ch_pos[ch1],
+        ch_pos[ch2],
+    )  # use second channel so grid counts the right way
+
+mne_gui.locate_ieeg(
+    raw_ecog.info,
+    subj_trans_ecog,
+    CT_aligned_ecog,
+    subject="sample_ecog",
+    subjects_dir=misc_path / "ecog",
+    targets=targets,
 )
 
 # %%
