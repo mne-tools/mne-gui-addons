@@ -515,9 +515,15 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )[0]
         if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
             # add 2D lines on each slice plot if in max intensity projection
-            target_vox = apply_trans(self._ras_vox_t, pos[target_idx])
+            target_vox = apply_trans(
+                self._mri_scan_ras_t,
+                apply_trans(self._scan_ras_ras_vox_t, pos[target_idx]),
+            )
             insert_vox = apply_trans(
-                self._ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                self._mri_scan_ras_t,
+                apply_trans(
+                    self._scan_ras_ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
+                ),
             )
             lines_2D = list()
             for axis in range(3):
