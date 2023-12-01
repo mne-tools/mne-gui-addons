@@ -276,7 +276,7 @@ class SliceBrowser(QMainWindow):
 
         self._mr_mri_vox_t = np.linalg.inv(self._mr_vox_mri_t)
         self._mr_scan_ras_vox_t = np.linalg.inv(self._mr_vox_scan_ras_t)
-        
+
         self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
         self._scan_ras_ras_vox_t = np.linalg.inv(
