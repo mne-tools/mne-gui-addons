@@ -26,22 +26,22 @@ jobs:
         qt: [PyQt6]
         include:
           - os: macos-latest
-            python-version: "3.11"
+            python-version: "3.10"
             mne-version: mne-stable
             qt: PyQt6
           # Old (and PyQt5)
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.8"
             mne-version: mne-stable
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.10"
             mne-version: mne-main
             qt: PySide2
           # PySide6
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.10"
             mne-version: mne-main
             qt: PySide6
     steps:
