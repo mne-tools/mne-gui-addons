@@ -41,7 +41,8 @@ _TUBE_SCALAR = 0.1
 _BOLT_SCALAR = 30  # mm
 _CH_MENU_WIDTH = 30 if platform.system() == "Windows" else 15
 _VOXEL_NEIGHBORS_THRESH = 0.75
-_SEARCH_ANGLE_THRESH = 0.5
+_SEARCH_ANGLE_THRESH = np.deg2rad(30)
+_MISSING_PROP_OKAY = 0.25
 
 # 20 colors generated to be evenly spaced in a cube, worked better than
 # matplotlib color cycle
@@ -596,15 +597,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
                         rr_tmp = next_loc - np.array(
                             locs[-1] if direction == 1 else locs[0]
                         )
-                        rr_tmp /= np.linalg.norm(rr)  # normalize
-                        # must not change angle by more than about 30 degrees (0.5 radians)
-                        delta_angle = np.arccos(np.clip(np.dot(rr_tmp, rr), -1, 1))
+                        rr_tmp /= np.linalg.norm(rr_tmp)  # normalize
+                        # must not change angle by more than threshold
                         if (
-                            min([abs(delta_angle), abs(np.pi - delta_angle)])
+                            np.arccos(np.clip(np.dot(rr_tmp, rr), -1, 1))
                             < _SEARCH_ANGLE_THRESH
                         ):
                             t = 0
-                            rr = (rr + rr_tmp) / 2
+                            rr = rr_tmp
                             locs.insert(
                                 len(locs) if direction == 1 else 0, tuple(next_loc)
                             )
@@ -676,7 +676,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         ----------
         targets : dict
             Keys are names of groups (electrodes/grids) and values are target and
-            entry (optional) locations in scanner RAS.
+            entry (optional) locations in scanner RAS with units of meterse.
         check_nearest : int
             The number of nearest neighbors to check for completing lines. Increase
             if locations are not found because artifactual high-intensity areas
@@ -757,11 +757,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
                     if (len(names) - len(locs)) / len(
                         names
-                    ) < 0.1:  # quit search if 90% found
+                    ) < _MISSING_PROP_OKAY:  # quit search if 75% found
                         break
                 if (len(names) - len(locs)) / len(
                     names
-                ) < 0.1:  # quit search if enough locations found
+                ) < _MISSING_PROP_OKAY:  # quit search if 75% found
                     break
 
             if len(names) - len(locs) > 1:
