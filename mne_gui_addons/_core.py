@@ -45,6 +45,7 @@ from mne.viz.backends._utils import _qt_safe_window
 
 _IMG_LABELS = [["I", "P"], ["I", "L"], ["P", "L"]]
 _ZOOM_STEP_SIZE = 5
+_ZOOM_BORDER = 1 / 5
 
 
 @verbose
@@ -65,10 +66,11 @@ def _load_image(img, verbose=None):
     ornt_trans = nib.orientations.ornt_transform(ornt, ras_ornt)
     img_data = nib.orientations.apply_orientation(orig_data, ornt_trans)
     orig_mgh = nib.MGHImage(orig_data, img.affine)
+    vox_scan_ras_t = orig_mgh.header.get_vox2ras()
+    vox_mri_t = orig_mgh.header.get_vox2ras_tkr()
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
-    vox_ras_t = np.dot(orig_mgh.header.get_vox2ras_tkr(), aff_trans)
-    vox_scan_ras_t = np.dot(orig_mgh.header.get_vox2ras(), aff_trans)
-    return img_data, vox_ras_t, vox_scan_ras_t
+    ras_vox_scan_ras_t = np.dot(vox_scan_ras_t, aff_trans)
+    return img_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t
 
 
 def _make_mpl_plot(
@@ -177,7 +179,7 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, vox_ras_t, vox_scan_ras_t = _load_image(
+            self._mri_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t = _load_image(
                 op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
             )
 
@@ -185,28 +187,37 @@ class SliceBrowser(QMainWindow):
         if base_image is None:
             assert self._mri_data is not None
             self._base_data = self._mri_data
-            self._vox_ras_t = vox_ras_t
+            self._vox_mri_t = vox_mri_t
             self._vox_scan_ras_t = vox_scan_ras_t
+            self._ras_vox_scan_ras_t = ras_vox_scan_ras_t
         else:
-            self._base_data, self._vox_ras_t, self._vox_scan_ras_t = _load_image(
-                base_image
-            )
+            (
+                self._base_data,
+                self._vox_mri_t,
+                self._vox_scan_ras_t,
+                self._ras_vox_scan_ras_t,
+            ) = _load_image(base_image)
             if self._mri_data is not None:
                 if self._mri_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_ras_t, vox_ras_t, rtol=1e-6
+                    self._vox_scan_ras_t, vox_scan_ras_t, rtol=1e-6
                 ):
                     raise ValueError(
                         "Base image is not aligned to MRI, got "
                         f"Base shape={self._base_data.shape}, "
                         f"MRI shape={self._mri_data.shape}, "
-                        f"Base affine={vox_ras_t} and "
-                        f"MRI affine={self._vox_ras_t}, "
+                        f"Base affine={vox_scan_ras_t} and "
+                        f"MRI affine={self._vox_scan_ras_t}, "
                         "please provide an aligned image or do not use the "
                         "``subject`` and ``subjects_dir`` arguments"
                     )
 
-        self._ras_vox_t = np.linalg.inv(self._vox_ras_t)
+        self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
+        self._scan_ras_ras_vox_t = np.linalg.inv(
+            self._ras_vox_scan_ras_t
+        )  # to RAS voxels
+        self._scan_ras_mri_t = np.dot(self._vox_mri_t, self._scan_ras_vox_t)
+        self._mri_scan_ras_t = np.dot(self._vox_scan_ras_t, self._mri_vox_t)
         self._voxel_sizes = np.array(self._base_data.shape)
         self._voxel_ratios = self._voxel_sizes / self._voxel_sizes.min()
 
@@ -279,7 +290,7 @@ class SliceBrowser(QMainWindow):
                 patheffects.withStroke(linewidth=4, foreground="k", alpha=0.75)
             ],
         )
-        xyz = apply_trans(self._ras_vox_t, self._ras)
+        xyz = apply_trans(self._scan_ras_vox_t, self._ras)
         for axis in range(3):
             plot_x_idx, plot_y_idx = self._xy_idx[axis]
             fig = self._figs[axis]
@@ -406,8 +417,10 @@ class SliceBrowser(QMainWindow):
 
     def _update_camera(self, render=False):
         """Update the camera position."""
-        self._renderer.plotter.camera.focal_point = tuple(self._ras)
-        self._renderer._update()
+        self._renderer.set_camera(
+            focalpoint=tuple(self._ras),
+            reset_camera=False,
+        )
 
     def _on_scroll(self, event):
         """Process mouse scroll wheel event to zoom."""
@@ -422,17 +435,22 @@ class SliceBrowser(QMainWindow):
             rx, ry = [self._voxel_ratios[idx] for idx in self._xy_idx[axis]]
             xmin, xmax = fig.axes[0].get_xlim()
             ymin, ymax = fig.axes[0].get_ylim()
-            xmid = (xmin + xmax) / 2
-            ymid = (ymin + ymax) / 2
-            if sign == 1:  # may need to shift if zooming in
-                if abs(xmid - xcur) > delta / 2 * rx:
-                    xmid += delta * np.sign(xcur - xmid) * rx
-                if abs(ymid - ycur) > delta / 2 * ry:
-                    ymid += delta * np.sign(ycur - ymid) * ry
+
             xwidth = (xmax - xmin) / 2 - delta * rx
             ywidth = (ymax - ymin) / 2 - delta * ry
             if xwidth <= 0 or ywidth <= 0:
                 return
+
+            xmid = (xmin + xmax) / 2
+            ymid = (ymin + ymax) / 2
+            if sign >= 0:  # may need to shift if zooming in or clicking
+                xedge = min([xmid + xwidth - xcur, xcur - xmid + xwidth])
+                if xedge < 2 * xwidth * _ZOOM_BORDER:
+                    xmid += np.sign(xcur - xmid) * (2 * xwidth * _ZOOM_BORDER - xedge)
+                yedge = min([ymid + ywidth - ycur, ycur - ymid + ywidth])
+                if yedge < 2 * ywidth * _ZOOM_BORDER:
+                    ymid += np.sign(ycur - ymid) * (2 * ywidth * _ZOOM_BORDER - yedge)
+
             fig.axes[0].set_xlim(xmid - xwidth, xmid + xwidth)
             fig.axes[0].set_ylim(ymid - ywidth, ymid + ywidth)
             if draw:
@@ -465,11 +483,11 @@ class SliceBrowser(QMainWindow):
             return
         if text_kind == "vox":
             vox = vals
-            ras = apply_trans(self._vox_ras_t, vox)
+            ras = apply_trans(self._vox_scan_ras_t, vox)
         else:
             assert text_kind == "ras"
             ras = vals
-            vox = apply_trans(self._ras_vox_t, ras)
+            vox = apply_trans(self._scan_ras_vox_t, ras)
         wrong_size = any(
             var < 0 or var > n - 1 for var, n in zip(vox, self._voxel_sizes)
         )
@@ -498,12 +516,12 @@ class SliceBrowser(QMainWindow):
         msg = ", ".join(f"{x:0.2f}" for x in ras)
         logger.debug(f"Trying RAS:  ({msg}) mm")
         # clip to valid
-        vox = apply_trans(self._ras_vox_t, ras)
+        vox = apply_trans(self._scan_ras_vox_t, ras)
         vox = np.array(
             [np.clip(d, 0, self._voxel_sizes[ii] - 1) for ii, d in enumerate(vox)]
         )
         # transform back, make write-only
-        self._ras_safe = apply_trans(self._vox_ras_t, vox)
+        self._ras_safe = apply_trans(self._vox_scan_ras_t, vox)
         self._ras_safe.flags["WRITEABLE"] = False
         msg = ", ".join(f"{x:0.2f}" for x in self._ras_safe)
         logger.debug(f"Setting RAS: ({msg}) mm")
@@ -518,15 +536,15 @@ class SliceBrowser(QMainWindow):
         vox : array-like
             The voxel coordinate.
         """
-        self._set_ras(apply_trans(self._vox_ras_t, vox))
+        self._set_ras(apply_trans(self._vox_scan_ras_t, vox))
 
     @property
     def _vox(self):
-        return apply_trans(self._ras_vox_t, self._ras)
+        return apply_trans(self._scan_ras_vox_t, self._ras)
 
     @property
     def _current_slice(self):
-        return self._vox.round().astype(int)
+        return apply_trans(self._scan_ras_ras_vox_t, self._ras).round().astype(int)
 
     def _draw(self, axis=None):
         """Update the figures with a draw call."""
@@ -549,8 +567,9 @@ class SliceBrowser(QMainWindow):
 
     def _move_cursors_to_pos(self):
         """Move the cursors to a position."""
+        ras_vox = apply_trans(self._scan_ras_ras_vox_t, self._ras)
         for axis in range(3):
-            x, y = self._vox[list(self._xy_idx[axis])]
+            x, y = ras_vox[list(self._xy_idx[axis])]
             self._images["cursor_v"][axis].set_xdata([x, x])
             self._images["cursor_h"][axis].set_ydata([y, y])
         self._update_images(draw=True)
@@ -628,16 +647,19 @@ class SliceBrowser(QMainWindow):
             # Data coordinates are voxel coordinates
             pos = (event.xdata, event.ydata)
             logger.debug(f'Clicked {"XYZ"[axis]} ({axis}) axis at pos {pos}')
-            xyz = self._vox
+            xyz = apply_trans(self._scan_ras_ras_vox_t, self._ras)
             xyz[list(self._xy_idx[axis])] = pos
-            logger.debug(f"Using voxel  {list(xyz)}")
-            ras = apply_trans(self._vox_ras_t, xyz)
+            logger.debug(f"Using RAS voxel  {list(xyz)}")
+            ras = apply_trans(self._ras_vox_scan_ras_t, xyz)
             self._set_ras(ras)
+            self._zoom(sign=0, draw=True)
 
     def _update_moved(self):
         """Update when cursor position changes."""
         self._RAS_textbox.setText("{:.2f}, {:.2f}, {:.2f}".format(*self._ras))
-        self._VOX_textbox.setText("{:3d}, {:3d}, {:3d}".format(*self._current_slice))
+        self._VOX_textbox.setText(
+            "{:3d}, {:3d}, {:3d}".format(*self._vox.round().astype(int))
+        )
         self._intensity_label.setText(
             "intensity = {:.2f}".format(self._base_data[tuple(self._current_slice)])
         )

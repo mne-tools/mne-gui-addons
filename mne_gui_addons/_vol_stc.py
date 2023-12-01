@@ -30,7 +30,7 @@ from mne.defaults import DEFAULTS
 from mne.evoked import EvokedArray
 from mne.time_frequency import EpochsTFR
 from mne.io.constants import FIFF
-from mne.io.pick import _get_channel_types, _picks_to_idx, _pick_inst
+from mne.io.pick import _picks_to_idx
 from mne.transforms import apply_trans
 from mne.utils import (
     _require_version,
@@ -241,7 +241,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         (
             self._src_lut,
             self._src_vox_scan_ras_t,
-            self._src_vox_ras_t,
+            self._src_vox_mri_t,
             self._src_rr,
         ) = _get_src_lut(src)
         self._src_scan_ras_vox_t = np.linalg.inv(self._src_vox_scan_ras_t)
@@ -294,9 +294,11 @@ class VolSourceEstimateViewer(SliceBrowser):
         self._images["stc"] = list()
         src_shape = np.array(self._src_lut.shape)
         corners = [  # center pixel on location
-            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_vox_t),
             _coord_to_coord(
-                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_vox_t
+                (0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
+            ),
+            _coord_to_coord(
+                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
             ),
         ]
         src_coord = self._get_src_coord()
@@ -347,8 +349,8 @@ class VolSourceEstimateViewer(SliceBrowser):
         # TO DO: add surface source space viewing as elif
         if any([this_src["type"] == "vol" for this_src in self._src]):
             scalars = np.array(np.where(np.isnan(self._stc_img), 0, 1.0))
-            spacing = np.diag(self._src_vox_ras_t)[:3]
-            origin = self._src_vox_ras_t[:3, 3] - spacing / 2.0
+            spacing = np.diag(self._src_vox_mri_t)[:3]
+            origin = self._src_vox_mri_t[:3, 3] - spacing / 2.0
             center = 0.5 * self._stc_range - self._stc_min
             (
                 self._grid,
@@ -404,11 +406,7 @@ class VolSourceEstimateViewer(SliceBrowser):
     def _get_src_coord(self):
         """Get the current slice transformed to source space."""
         return tuple(
-            np.round(
-                _coord_to_coord(
-                    self._current_slice, self._vox_scan_ras_t, self._src_scan_ras_vox_t
-                )
-            ).astype(int)
+            np.round(apply_trans(self._src_scan_ras_vox_t, self._ras)).astype(int)
         )
 
     def _update_stc_pick(self):
@@ -743,7 +741,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             hbox.addWidget(QLabel("Topo Data="))
             self._data_type_selector = QComboBox()
             self._data_type_selector.addItems(
-                _get_channel_types(self._inst.info, picks="data", unique=True)
+                self._inst.info.get_channel_types(picks="data", unique=True)
             )
             self._data_type_selector.currentTextChanged.connect(self._update_data_type)
             self._data_type_selector.setSizeAdjustPolicy(QComboBox.AdjustToContents)
@@ -874,7 +872,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 copy=False,
             )
 
-        info = _pick_inst(self._inst, dtype, "bads").info
+        info = self._inst.pick(dtype, exclude="bads").info
         ave = EvokedArray(evo_data, info, tmin=self._inst.times[0])
 
         ave_max = evo_data.max()
@@ -1275,10 +1273,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._freq_slider.setValue(f_idx)
         self._time_slider.setValue(t_idx)
         max_coord = np.array(np.where(self._src_lut == stc_idx)).flatten()
-        max_coord_mri = _coord_to_coord(
-            max_coord, self._src_vox_scan_ras_t, self._scan_ras_vox_t
-        )
-        self._set_ras(apply_trans(self._vox_ras_t, max_coord_mri))
+        self._set_ras(apply_trans(self._src_vox_scan_ras_t, max_coord))
 
     def _plot_data(self, draw=True):
         """Update which coordinate's data is being shown."""
@@ -1314,9 +1309,12 @@ class VolSourceEstimateViewer(SliceBrowser):
             label_str = "{:.3e}"
         elif np.issubdtype(self._stc_img.dtype, np.integer):
             label_str = "{:d}"
+        coord = self._get_src_coord()
         self._intensity_label.setText(
             ("intensity = " + label_str).format(
-                self._stc_img[tuple(self._get_src_coord())]
+                self._stc_img[coord]
+                if all([coord[i] < self._stc_img.shape[i] for i in range(3)])
+                else np.nan
             )
         )
 

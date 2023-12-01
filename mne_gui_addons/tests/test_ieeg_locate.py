@@ -11,7 +11,7 @@ import pytest
 import mne
 from mne.datasets import testing
 from mne.transforms import apply_trans
-from mne.utils import requires_version, use_log_level
+from mne.utils import use_log_level
 from mne.viz.utils import _fake_click
 import mne_gui_addons as mne_gui
 
@@ -88,10 +88,10 @@ def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
 
 
 @pytest.mark.allow_unclosed_pyside2
-@requires_version("sphinx_gallery")
 @testing.requires_testing_data
 def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_path):
     """Test sphinx-gallery scraping of the GUI."""
+    pytest.importorskip("sphinx_gallery")
     raw = mne.io.read_raw_fif(raw_path)
     raw.pick_types(eeg=True)
     ch_dict = {
