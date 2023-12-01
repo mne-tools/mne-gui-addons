@@ -42,7 +42,7 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              pip install --upgrade PyQt6 sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn opencv-python dipy git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube
+              pip install --upgrade PyQt6 sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube
               pip install -ve ./mne-python .
         - run:
             name: Check Qt

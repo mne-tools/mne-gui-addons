@@ -124,6 +124,8 @@ class SliceBrowser(QMainWindow):
         self._subject_dir = (
             op.join(subjects_dir, subject) if subject and subjects_dir else None
         )
+        if self._subject_dir is None and base_image is None:
+            raise ValueError('`subjects_dir` must be provided if no `base_image` is provided')
         self._load_image_data(base_image=base_image)
 
         # GUI design
