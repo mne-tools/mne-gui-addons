@@ -112,7 +112,13 @@ def _load_image(img, verbose=None):
     vox_mri_t = orig_mgh.header.get_vox2ras_tkr()
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
     ras_vox_scan_ras_t = np.dot(vox_scan_ras_t, aff_trans)
-    return img_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t, _get_volume_info(orig_mgh)
+    return (
+        img_data,
+        vox_mri_t,
+        vox_scan_ras_t,
+        ras_vox_scan_ras_t,
+        _get_volume_info(orig_mgh),
+    )
 
 
 def _make_mpl_plot(
