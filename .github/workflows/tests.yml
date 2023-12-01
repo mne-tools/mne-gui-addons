@@ -21,28 +21,27 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11"]  # Newest supported version (dipy not out for 3.11 yet!)
+        python-version: ["3.12"]
         mne-version: [mne-main]
         qt: [PyQt6]
         include:
-          # macOS (can be moved above once Dipy releases 3.11 wheels)
           - os: macos-latest
-            python-version: "3.10"
+            python-version: "3.12"
             mne-version: mne-stable
             qt: PyQt6
           # Old (and PyQt5)
           - os: ubuntu-latest
-            python-version: "3.9"
+            python-version: "3.10"
             mne-version: mne-stable
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             mne-version: mne-main
             qt: PySide2
           # PySide6
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             mne-version: mne-main
             qt: PySide6
     steps:
