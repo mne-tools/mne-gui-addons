@@ -236,7 +236,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self.setCentralWidget(central_widget)
 
     def _configure_grid_layout(self):
-        """Configure the sidebar for aliging a grid."""
+        """Configure the sidebar for aligning a grid."""
         grid_layout = QHBoxLayout()
 
         show_grid_button = QPushButton("Add Grid")
