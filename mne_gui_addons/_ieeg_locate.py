@@ -40,6 +40,8 @@ _RADIUS_SCALAR = 0.4
 _TUBE_SCALAR = 0.1
 _BOLT_SCALAR = 30  # mm
 _CH_MENU_WIDTH = 30 if platform.system() == "Windows" else 15
+_VOXEL_NEIGHBORS_THRESH = 0.75
+_SEARCH_ANGLE_THRESH = 0.5
 
 # 20 colors generated to be evenly spaced in a cube, worked better than
 # matplotlib color cycle
@@ -490,25 +492,23 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _deduplicate_local_maxima(self, local_maxima):
         """De-duplicate peaks by finding center of mass of high-intensity voxels."""
-        local_maxima2 = set()
+        local_maxima2 = list()
         for local_max in local_maxima:
             neighbors = _voxel_neighbors(
                 local_max,
                 self._ct_data,
-                thresh=0.5,
+                thresh=_VOXEL_NEIGHBORS_THRESH,
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
             loc = np.array(list(neighbors)).mean(axis=0)
-            if (
-                not local_maxima2
-                or np.min(
-                    [np.linalg.norm(np.array(loc2) - loc) for loc2 in local_maxima2]
-                )
-                > 2  # must be one full voxel away
-            ):
-                local_maxima2.add(tuple(loc))
-        return np.array([np.array(local_max) for local_max in local_maxima2])
+            if not local_maxima2 or np.min(
+                np.linalg.norm(np.array(local_maxima2) - loc, axis=1)
+            ) > np.sqrt(
+                3
+            ):  # must be more than (1, 1, 1) voxel away
+                local_maxima2.append(loc)
+        return np.array(local_maxima2)
 
     def _find_local_maxima(self, target, check_nearest=5, max_search_radius=50):
         target_vox = (
@@ -533,8 +533,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
             local_maxima = local_maxima[
                 np.argsort(
-                    [self._ct_data[tuple(local_max)] for local_max in local_maxima]
-                )[::-1]
+                    [
+                        np.linalg.norm(local_max - target_vox)
+                        for local_max in local_maxima
+                    ]
+                )
             ]
             local_maxima = self._deduplicate_local_maxima(local_maxima)
             search_radius += 1
@@ -553,11 +556,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
         locs = [tuple(tv)]
         for direction in (1, -1):
             t = direction
+            rr = r.copy()  # modify for course correction
             # stop when all the contacts or found or you have moved more than
             # max_search radius without finding another one
-            while abs(t) < max_search_radius:
+            while abs(t) < (
+                max_search_radius
+                if direction == 1 or len(locs) < 2
+                else 2 * np.linalg.norm(np.array(locs[1]) - np.array(locs[0]))
+            ):
                 check_vox = (
-                    (locs[-1 if direction == 1 else 0] + t * r).round().astype(int)
+                    (locs[-1 if direction == 1 else 0] + t * rr).round().astype(int)
                 )
                 next_locs = (
                     np.array(
@@ -580,9 +588,27 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 )
                 next_locs = self._deduplicate_local_maxima(next_locs)
                 for next_loc in next_locs:
-                    if np.min([np.linalg.norm(next_loc - loc) for loc in locs]) > 1:
-                        t = 0
-                        locs.insert(len(locs) if direction == 1 else 0, tuple(next_loc))
+                    # must be one full voxel away (sqrt(3)) from all other contacts
+                    if np.min(
+                        [np.linalg.norm(next_loc - loc) for loc in locs]
+                    ) > np.sqrt(3):
+                        # update the direction to account for bent electrodes and grids contoured to the brain
+                        rr_tmp = next_loc - np.array(
+                            locs[-1] if direction == 1 else locs[0]
+                        )
+                        rr_tmp /= np.linalg.norm(rr)  # normalize
+                        # must not change angle by more than about 30 degrees (0.5 radians)
+                        delta_angle = np.arccos(np.clip(np.dot(rr_tmp, rr), -1, 1))
+                        if (
+                            min([abs(delta_angle), abs(np.pi - delta_angle)])
+                            < _SEARCH_ANGLE_THRESH
+                        ):
+                            t = 0
+                            rr = (rr + rr_tmp) / 2
+                            locs.insert(
+                                len(locs) if direction == 1 else 0, tuple(next_loc)
+                            )
+                            break
                 t += direction
         return locs
 
@@ -618,13 +644,24 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 break
         if len(locs2) < 3:
             return locs  # only found a line
+        grid = [locs]
         for tv2 in locs2[1:]:  # loop over perpendicular line to find each next line
             locs3 = self._auto_find_line(
                 tv2, r, max_search_radius=max_search_radius, voxel_tol=voxel_tol
             )
             if locs3:
-                locs += locs3
-        return locs
+                grid.append(locs3)
+        n = int(round(np.median([len(row) for row in grid])))
+        # flatten, homogenize row lengths
+        return [
+            loc
+            for row in grid
+            for loc in (
+                row[:n]
+                if len(row) >= n
+                else row + [(np.nan, np.nan, np.nan)] * (n - len(row))
+            )
+        ]
 
     def auto_find_contacts(
         self,
@@ -654,6 +691,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             be in order to be marked.
         """
         _validate_type(targets, (dict,), "targets")
+        auto_max_search_radius = max_search_radius == "auto"
         self._update_ct_maxima()
         for elec, target in targets.items():
             if len(target) == 2:
@@ -676,7 +714,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             is_ecog = all(
                 [self._info.ch_names.index(name) in self._ecog_idx for name in names]
             )
-            if max_search_radius == "auto":
+            if auto_max_search_radius:
                 max_search_radius = 10 if is_ecog else 50
             if not names or not all(
                 [np.isnan(self._chs[name]).all() for name in names]
@@ -717,11 +755,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
                             voxel_tol=voxel_tol,
                         )
 
-                    if (
-                        len(names) - len(locs) < 2
-                    ):  # quit search if enough locations found
+                    if (len(names) - len(locs)) / len(
+                        names
+                    ) < 0.1:  # quit search if 90% found
                         break
-                if len(names) - len(locs) < 2:  # quit search if enough locations found
+                if (len(names) - len(locs)) / len(
+                    names
+                ) < 0.1:  # quit search if enough locations found
                     break
 
             if len(names) - len(locs) > 1:
@@ -730,11 +770,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
             # assign locations
             for name, loc in zip(names, locs):
-                vox = apply_trans(self._ras_vox_scan_ras_t, loc)
-                self._chs[name][:] = apply_trans(
-                    self._scan_ras_mri_t, vox
-                )  # to surface RAS
-                self._color_list_item(name)
+                if not np.isnan(loc).any():
+                    vox = apply_trans(self._ras_vox_scan_ras_t, loc)
+                    self._chs[name][:] = apply_trans(
+                        self._scan_ras_mri_t, vox
+                    )  # to surface RAS
+                    self._color_list_item(name)
         self._save_ch_coords()
 
     def _auto_mark_group(self):
@@ -931,7 +972,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             neighbors = _voxel_neighbors(
                 self._vox,
                 self._ct_data,
-                thresh=0.5,
+                thresh=_VOXEL_NEIGHBORS_THRESH,
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
@@ -1011,7 +1052,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Update CT and channel images when general changes happen."""
         self._update_ch_images(axis=axis)
         self._update_mri_images(axis=axis)
-        super()._update_images()
+        self._update_ct_images(axis=axis)
+        if draw:
+            self._draw(axis)
 
     def _update_ct_scale(self):
         """Update CT min slider value."""
