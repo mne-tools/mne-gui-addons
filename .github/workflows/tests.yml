@@ -62,7 +62,7 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: pip install -v ${{ matrix.qt }}
+    - run: pip install -v ${{ matrix.qt }} "PyQt6-Qt6!=6.6.1"
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - run: |
