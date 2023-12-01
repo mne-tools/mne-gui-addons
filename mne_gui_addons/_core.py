@@ -107,10 +107,11 @@ def _load_image(img, verbose=None):
     ornt_trans = nib.orientations.ornt_transform(ornt, ras_ornt)
     img_data = nib.orientations.apply_orientation(orig_data, ornt_trans)
     orig_mgh = nib.MGHImage(orig_data, img.affine)
+    vox_scan_ras_t = orig_mgh.header.get_vox2ras()
+    vox_mri_t = orig_mgh.header.get_vox2ras_tkr()
     aff_trans = nib.orientations.inv_ornt_aff(ornt_trans, img.shape)
-    vox_ras_t = np.dot(orig_mgh.header.get_vox2ras_tkr(), aff_trans)
-    vox_scan_ras_t = np.dot(orig_mgh.header.get_vox2ras(), aff_trans)
-    return img_data, vox_ras_t, vox_scan_ras_t, _get_volume_info(orig_mgh)
+    ras_vox_scan_ras_t = np.dot(vox_scan_ras_t, aff_trans)
+    return img_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t, _get_volume_info(orig_mgh)
 
 
 def _make_mpl_plot(
@@ -228,6 +229,7 @@ class SliceBrowser(QMainWindow):
                 self._mri_data,
                 self._mri_vox_ras_t,
                 self._mri_vox_scan_ras_t,
+                self._mri_ras_vox_scan_ras_t,
                 self._vol_info,
             ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
             self._mri_ras_vox_t = np.linalg.inv(self._mri_vox_ras_t)
@@ -239,16 +241,18 @@ class SliceBrowser(QMainWindow):
             self._base_data = self._mri_data
             self._vox_ras_t = self._mri_vox_ras_t
             self._vox_scan_ras_t = self._mri_vox_scan_ras_t
+            self._ras_vox_scan_ras_t = self._mri_ras_vox_scan_ras_t
         else:
             (
                 self._base_data,
                 self._vox_ras_t,
                 self._vox_scan_ras_t,
+                self._ras_vox_scan_ras_t,
                 self._vol_info,
             ) = _load_image(base_image)
             if self._mri_data is not None and check_aligned:
                 if self._mri_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_ras_t, self._mri_vox_ras_t, rtol=1e-6
+                    self._vox_scan_ras_t, vox_scan_ras_t, rtol=1e-6
                 ):
                     raise ValueError(
                         "Base image is not aligned to MRI, got "
