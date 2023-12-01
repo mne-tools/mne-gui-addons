@@ -2,7 +2,7 @@
 name = "mne-gui-addons"
 description = "MNE-Python GUI addons."
 readme = "README.rst"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {file = "LICENSE"}
 keywords = ["science", "neuroscience", "psychology"]
 authors = [
