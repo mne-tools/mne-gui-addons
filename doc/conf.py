@@ -3,7 +3,6 @@ import os
 import sys
 
 import pyvista
-import mne
 import mne_gui_addons
 
 faulthandler.enable()
@@ -21,6 +20,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "numpydoc",
     "sphinx_gallery.gen_gallery",
+    "sphinxcontrib.bibtex",
+    "sphinxcontrib.youtube",
 ]
 templates_path = ["_templates"]
 source_suffix = ".rst"
@@ -39,6 +40,7 @@ intersphinx_mapping = {
         "https://dipy.org/documentation/latest/objects.inv/",
     ),
     "mne": ("https://mne.tools/stable", None),
+    "mne_bids": ("https://mne.tools/mne-bids/stable", None),
 }
 numpydoc_class_members_toctree = False
 numpydoc_attributes_as_param_list = True
@@ -106,7 +108,7 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "min_reported_time": 1.0,
     "abort_on_example_error": False,
-    "image_scrapers": ("matplotlib", mne.gui._GUIScraper(), "pyvista"),
+    "image_scrapers": ("matplotlib", mne_gui_addons._GUIScraper(), "pyvista"),
     "show_memory": not sys.platform.startswith(("win", "darwin")),
     "line_numbers": False,  # messes with style
     "capture_repr": ("_repr_html_",),
@@ -157,3 +159,8 @@ html_show_sourcelink = False
 html_copy_source = False
 html_show_sphinx = False
 htmlhelp_basename = "mne-gui-addons-doc"
+
+# sphinxcontrib-bibtex
+bibtex_bibfiles = ["./references.bib"]
+bibtex_style = "unsrt"
+bibtex_footbibliography_header = ""

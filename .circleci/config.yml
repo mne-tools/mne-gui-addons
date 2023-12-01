@@ -30,6 +30,7 @@ jobs:
               echo "set -e" >> $BASH_ENV
               echo "export OPENBLAS_NUM_THREADS=4" >> $BASH_ENV
               echo "export XDG_RUNTIME_DIR=/tmp/runtime-circleci" >> $BASH_ENV
+              echo "export MNE_3D_OPTION_MULTI_SAMPLES=1" >> $BASH_ENV
               echo "export PATH=~/.local/bin/:$PATH" >> $BASH_ENV
               echo "export DISPLAY=:99" >> $BASH_ENV
               echo "source ~/python_env/bin/activate" >> $BASH_ENV
@@ -41,7 +42,7 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              pip install --upgrade PyQt6 sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn git+https://github.com/pyvista/pyvista@main memory_profiler
+              pip install --upgrade PyQt6 sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn autoreject git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube
               pip install -ve ./mne-python .
         - run:
             name: Check Qt
@@ -63,7 +64,7 @@ jobs:
         - run:
             name: Get data
             command: |
-              python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True)"
+              python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True); mne.datasets.misc.data_path(update_path=True, verbose=True);"
               ls -al ~/mne_data;
         - run:
             name: make html
@@ -85,6 +86,10 @@ jobs:
             key: data-cache-somato
             paths:
               - ~/mne_data/MNE-somato-data
+        - save_cache:
+            key: data-cache-misc
+            paths:
+              - ~/mne_data/MNE-misc-data
 
     deploy:
       machine:

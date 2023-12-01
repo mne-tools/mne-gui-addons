@@ -30,7 +30,7 @@ from mne.defaults import DEFAULTS
 from mne.evoked import EvokedArray
 from mne.time_frequency import EpochsTFR
 from mne.io.constants import FIFF
-from mne.io.pick import _get_channel_types, _picks_to_idx, _pick_inst
+from mne.io.pick import _picks_to_idx
 from mne.transforms import apply_trans
 from mne.utils import (
     _require_version,
@@ -144,8 +144,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             averaged across epochs and ``n_freqs`` may be 1 for data
             that is in time only and is not time-frequency decomposed. For
             faster performance, data can be cast to integers or a
-            custom complex data type that uses integers as done by
-            :func:`mne.gui.view_vol_stc`.
+            custom complex data type that uses integers.
         %(subject)s
         %(subjects_dir)s
         src : instance of SourceSpaces
@@ -242,7 +241,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         (
             self._src_lut,
             self._src_vox_scan_ras_t,
-            self._src_vox_ras_t,
+            self._src_vox_mri_t,
             self._src_rr,
         ) = _get_src_lut(src)
         self._src_scan_ras_vox_t = np.linalg.inv(self._src_vox_scan_ras_t)
@@ -266,9 +265,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._inst.freqs.size // 2 if hasattr(self._inst, "freqs") else None
         )
         self._alpha = 0.75
-        self._epoch_idx = (
-            "Subject 0" if self._group else "Average" + " Power" * self._is_complex
-        )
+        self._epoch_idx = "Average" + " Power" * (self._is_complex and not self._group)
 
         # initialize current 3D image for chosen time and frequency
         stc_data = self._pick_epoch(self._data)
@@ -297,9 +294,11 @@ class VolSourceEstimateViewer(SliceBrowser):
         self._images["stc"] = list()
         src_shape = np.array(self._src_lut.shape)
         corners = [  # center pixel on location
-            _coord_to_coord((0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_vox_t),
             _coord_to_coord(
-                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_vox_t
+                (0,) * 3, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
+            ),
+            _coord_to_coord(
+                src_shape - 1, self._src_vox_scan_ras_t, self._scan_ras_ras_vox_t
             ),
         ]
         src_coord = self._get_src_coord()
@@ -350,8 +349,8 @@ class VolSourceEstimateViewer(SliceBrowser):
         # TO DO: add surface source space viewing as elif
         if any([this_src["type"] == "vol" for this_src in self._src]):
             scalars = np.array(np.where(np.isnan(self._stc_img), 0, 1.0))
-            spacing = np.diag(self._src_vox_ras_t)[:3]
-            origin = self._src_vox_ras_t[:3, 3] - spacing / 2.0
+            spacing = np.diag(self._src_vox_mri_t)[:3]
+            origin = self._src_vox_mri_t[:3, 3] - spacing / 2.0
             center = 0.5 * self._stc_range - self._stc_min
             (
                 self._grid,
@@ -407,11 +406,7 @@ class VolSourceEstimateViewer(SliceBrowser):
     def _get_src_coord(self):
         """Get the current slice transformed to source space."""
         return tuple(
-            np.round(
-                _coord_to_coord(
-                    self._current_slice, self._vox_scan_ras_t, self._src_scan_ras_vox_t
-                )
-            ).astype(int)
+            np.round(apply_trans(self._src_scan_ras_vox_t, self._ras)).astype(int)
         )
 
     def _update_stc_pick(self):
@@ -590,12 +585,11 @@ class VolSourceEstimateViewer(SliceBrowser):
 
         if self._data.shape[0] > 1:
             self._epoch_selector = QComboBox()
-            if not self._group:
-                if self._is_complex:
-                    self._epoch_selector.addItems(["Average Power"])
-                    self._epoch_selector.addItems(["ITC"])
-                else:
-                    self._epoch_selector.addItems(["Average"])
+            if self._is_complex and not self._group:
+                self._epoch_selector.addItems(["Average Power"])
+                self._epoch_selector.addItems(["ITC"])
+            else:
+                self._epoch_selector.addItems(["Average"])
             self._epoch_selector.addItems(
                 [f"{self._selector_prefix} {i}" for i in range(self._data.shape[0])]
             )
@@ -747,7 +741,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             hbox.addWidget(QLabel("Topo Data="))
             self._data_type_selector = QComboBox()
             self._data_type_selector.addItems(
-                _get_channel_types(self._inst.info, picks="data", unique=True)
+                self._inst.info.get_channel_types(picks="data", unique=True)
             )
             self._data_type_selector.currentTextChanged.connect(self._update_data_type)
             self._data_type_selector.setSizeAdjustPolicy(QComboBox.AdjustToContents)
@@ -824,31 +818,43 @@ class VolSourceEstimateViewer(SliceBrowser):
         units = DEFAULTS["units"][dtype]
         scaling = DEFAULTS["scalings"][dtype]
 
-        inst = (
-            self._insts[int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))]
-            if self._group
-            else self._inst
-        )
-        if isinstance(inst, EpochsTFR):
-            inst_data = inst.data
+        if isinstance(self._inst, EpochsTFR):
             scaling *= scaling  # power is squared
             units = f"({units})" + r"$^2$/Hz"
-        elif isinstance(inst, BaseEpochs):
-            inst_data = inst.get_data()
-        else:
-            inst_data = inst.data[None]  # new axis for single epoch
-
-        # convert to power or ITC for group
-        if self._group == "ITC" and np.iscomplexobj(inst_data):
-            inst_data = np.abs((inst_data / np.abs(inst_data)))
-        elif self._group and np.iscomplexobj(inst_data):  # power
-            inst_data = (inst_data * inst_data.conj()).real
 
         if self._epoch_idx == "ITC":
             units = "ITC"
             scaling = 1
 
-        pick_idx = _picks_to_idx(inst.info, dtype)
+        def get_inst_data(inst):
+            if isinstance(inst, EpochsTFR):
+                inst_data = inst.data
+            elif isinstance(inst, BaseEpochs):
+                inst_data = inst.get_data()
+            else:
+                inst_data = inst.data[None]  # new axis for single epoch
+            # convert to power or ITC for group
+            if self._group == "ITC" and np.iscomplexobj(inst_data):
+                inst_data = np.abs((inst_data / np.abs(inst_data)))
+            elif self._group and np.iscomplexobj(inst_data):  # power
+                inst_data = (inst_data * inst_data.conj()).real
+            return inst_data
+
+        if self._group:
+            if self._epoch_idx == "Average":
+                inst_data = np.concatenate(
+                    [get_inst_data(inst) for inst in self._insts], axis=0
+                )
+            else:
+                inst_data = get_inst_data(
+                    self._insts[
+                        int(self._epoch_idx.replace(f"{self._selector_prefix} ", ""))
+                    ]
+                )
+        else:
+            inst_data = get_inst_data(self._inst)
+
+        pick_idx = _picks_to_idx(self._inst.info, dtype)
         inst_data = inst_data[:, pick_idx]
 
         evo_data = self._pick_epoch(inst_data) * scaling
@@ -866,7 +872,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 copy=False,
             )
 
-        info = _pick_inst(inst, dtype, "bads").info
+        info = self._inst.pick(dtype, exclude="bads").info
         ave = EvokedArray(evo_data, info, tmin=self._inst.times[0])
 
         ave_max = evo_data.max()
@@ -1267,10 +1273,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._freq_slider.setValue(f_idx)
         self._time_slider.setValue(t_idx)
         max_coord = np.array(np.where(self._src_lut == stc_idx)).flatten()
-        max_coord_mri = _coord_to_coord(
-            max_coord, self._src_vox_scan_ras_t, self._scan_ras_vox_t
-        )
-        self._set_ras(apply_trans(self._vox_ras_t, max_coord_mri))
+        self._set_ras(apply_trans(self._src_vox_scan_ras_t, max_coord))
 
     def _plot_data(self, draw=True):
         """Update which coordinate's data is being shown."""
@@ -1306,9 +1309,12 @@ class VolSourceEstimateViewer(SliceBrowser):
             label_str = "{:.3e}"
         elif np.issubdtype(self._stc_img.dtype, np.integer):
             label_str = "{:d}"
+        coord = self._get_src_coord()
         self._intensity_label.setText(
             ("intensity = " + label_str).format(
-                self._stc_img[tuple(self._get_src_coord())]
+                self._stc_img[coord]
+                if all([coord[i] < self._stc_img.shape[i] for i in range(3)])
+                else np.nan
             )
         )
 

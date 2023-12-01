@@ -11,8 +11,9 @@ import pytest
 import mne
 from mne.datasets import testing
 from mne.transforms import apply_trans
-from mne.utils import requires_version, use_log_level
+from mne.utils import use_log_level
 from mne.viz.utils import _fake_click
+import mne_gui_addons as mne_gui
 
 data_path = testing.data_path(download=False)
 subject = "sample"
@@ -67,7 +68,6 @@ def _fake_CT_coords(skull_size=5, contact_size=2):
 def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the intracranial location GUI."""
     nib = pytest.importorskip("nibabel")
-    import mne.gui
 
     info = mne.create_info([], 1000)
 
@@ -76,7 +76,7 @@ def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
 
     trans = mne.transforms.Transform("head", "mri")
     with pytest.raises(ValueError, match="No channels found in `info` to locate"):
-        mne.gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
+        mne_gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
 
     info = mne.create_info(["test"], 1000, "seeg")
     montage = mne.channels.make_dig_montage({"test": [0, 0, 0]}, coord_frame="mri")
@@ -84,16 +84,14 @@ def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
         info.set_montage(montage)
     with pytest.raises(RuntimeError, match='must be in the "head" coordinate frame'):
         with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
-            mne.gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
+            mne_gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
 
 
 @pytest.mark.allow_unclosed_pyside2
-@requires_version("sphinx_gallery")
 @testing.requires_testing_data
 def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_path):
     """Test sphinx-gallery scraping of the GUI."""
-    import mne.gui
-
+    pytest.importorskip("sphinx_gallery")
     raw = mne.io.read_raw_fif(raw_path)
     raw.pick_types(eeg=True)
     ch_dict = {
@@ -102,13 +100,13 @@ def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_pat
         "EEG 003": "LSTN 1",
         "EEG 004": "LSTN 2",
     }
-    raw.pick_channels(list(ch_dict.keys()))
+    raw.pick(list(ch_dict.keys()))
     raw.rename_channels(ch_dict)
     raw.set_montage(None)
     aligned_ct, _ = _fake_CT_coords
     trans = mne.read_trans(fname_trans)
     with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
-        gui = mne.gui.locate_ieeg(
+        gui = mne_gui.locate_ieeg(
             raw.info, trans, aligned_ct, subject=subject, subjects_dir=subjects_dir
         )
     (tmp_path / "_images").mkdir()
@@ -119,7 +117,7 @@ def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_pat
     )
     assert not image_path.is_file()
     assert not getattr(gui, "_scraped", False)
-    mne.gui._GUIScraper()(None, block_vars, gallery_conf)
+    mne_gui._GUIScraper()(None, block_vars, gallery_conf)
     assert image_path.is_file()
     assert gui._scraped
     # no need to call .close
@@ -137,7 +135,7 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
         "EEG 003": "LSTN 1",
         "EEG 004": "LSTN 2",
     }
-    raw.pick_channels(list(ch_dict.keys()))
+    raw.pick(list(ch_dict.keys()))
     raw.rename_channels(ch_dict)
     raw.set_eeg_reference("average")
     raw.set_channel_types({name: "seeg" for name in raw.ch_names})
@@ -146,7 +144,7 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
     trans = mne.read_trans(fname_trans)
 
     with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
-        gui = mne.gui.locate_ieeg(
+        gui = mne_gui.locate_ieeg(
             raw.info,
             trans,
             aligned_ct,
