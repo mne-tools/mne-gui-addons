@@ -223,7 +223,7 @@ class SliceBrowser(QMainWindow):
         if self._subject_dir is None:
             # if the recon-all is not finished or the CT is not
             # downsampled to the MRI, the MRI can not be used
-            self._mri_data = None
+            self._mr_data = None
             self._head = None
             self._lh = self._rh = None
         else:
@@ -233,44 +233,50 @@ class SliceBrowser(QMainWindow):
                 else "T1"
             )
             (
-                self._mri_data,
-                self._mri_vox_ras_t,
-                self._mri_vox_scan_ras_t,
-                self._mri_ras_vox_scan_ras_t,
+                self._mr_data,
+                self._mr_vox_mri_t,
+                self._mr_vox_scan_ras_t,
+                self._mr_ras_vox_scan_ras_t,
                 self._vol_info,
             ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
-            self._mri_ras_vox_t = np.linalg.inv(self._mri_vox_ras_t)
-            self._mri_scan_ras_vox_t = np.linalg.inv(self._mri_vox_scan_ras_t)
 
         # ready alternate base image if provided, otherwise use brain/T1
         if base_image is None:
-            assert self._mri_data is not None
-            self._base_data = self._mri_data
-            self._vox_ras_t = self._mri_vox_ras_t
-            self._vox_scan_ras_t = self._mri_vox_scan_ras_t
-            self._ras_vox_scan_ras_t = self._mri_ras_vox_scan_ras_t
+            assert self._mr_data is not None
+            self._base_data = self._mr_data
+            self._vox_mri_t = self._mr_vox_mri_t
+            self._vox_scan_ras_t = self._mr_vox_scan_ras_t
+            self._ras_vox_scan_ras_t = self._mr_ras_vox_scan_ras_t
         else:
             (
                 self._base_data,
-                self._vox_ras_t,
+                self._vox_mri_t,
                 self._vox_scan_ras_t,
                 self._ras_vox_scan_ras_t,
                 self._vol_info,
             ) = _load_image(base_image)
-            if self._mri_data is not None and check_aligned:
-                if self._mri_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_scan_ras_t, vox_scan_ras_t, rtol=1e-6
+            if self._mr_data is not None and check_aligned:
+                if self._mr_data.shape != self._base_data.shape or not np.allclose(
+                    self._vox_scan_ras_t, self._mr_vox_scan_ras_t, rtol=1e-6
                 ):
                     raise ValueError(
                         "Base image is not aligned to MRI, got "
                         f"Base shape={self._base_data.shape}, "
-                        f"MRI shape={self._mri_data.shape}, "
-                        f"Base affine={self._vox_ras_t} and "
-                        f"MRI affine={self._mri_vox_ras_t}, "
+                        f"MRI shape={self._mr_data.shape}, "
+                        f"Base affine={self._vox_scan_ras_t} and "
+                        f"MRI affine={self._mr_vox_scan_ras_t}, "
                         "please provide an aligned image or do not use the "
                         "``subject`` and ``subjects_dir`` arguments"
                     )
+            if self._mr_data is None:
+                # if no Freesurfer subjects directory provided, send 3D
+                # renderings to surface RAS of the base image
+                self._mr_vox_mri_t = self._vox_mri_t
+                self._mr_vox_scan_ras_t = self._vox_scan_ras_t
 
+        self._mr_mri_vox_t = np.linalg.inv(self._mr_vox_mri_t)
+        self._mr_scan_ras_vox_t = np.linalg.inv(self._mr_vox_scan_ras_t)
+        
         self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
         self._scan_ras_ras_vox_t = np.linalg.inv(

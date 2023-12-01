@@ -452,8 +452,8 @@ class VolumeSegmenter(SliceBrowser):
                 self._mri_scan_ras_vox_t, verts
             )  # scanner RAS -> mri vox
             verts = apply_trans(
-                self._mri_vox_ras_t, verts
-            )  # mri vox -> mri surface RAS
+                self._mr_vox_mri_t, verts
+            )  # mr voxels -> surface RAS
             self._vol_actor = self._renderer.mesh(
                 *verts.T,
                 tris,

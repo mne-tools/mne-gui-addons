@@ -683,7 +683,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if "mri" in self._images:
             for axis in range(3) if axis is None else [axis]:
                 self._images["mri"][axis].set_data(
-                    np.take(self._mri_data, self._current_slice[axis], axis=axis).T
+                    np.take(self._mr_data, self._current_slice[axis], axis=axis).T
                 )
                 if draw:
                     self._draw(axis)
@@ -847,7 +847,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._images["mri"] = list()
             for axis in range(3):
                 mri_data = np.take(
-                    self._mri_data, self._current_slice[axis], axis=axis
+                    self._mr_data, self._current_slice[axis], axis=axis
                 ).T
                 self._images["mri"].append(
                     self._figs[axis]
