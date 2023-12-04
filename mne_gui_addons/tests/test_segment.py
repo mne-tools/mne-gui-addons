@@ -9,8 +9,6 @@ from numpy.testing import assert_allclose
 import pytest
 
 from mne.datasets import testing
-from mne.utils import catch_logging, use_log_level
-from mne.viz.utils import _fake_click
 
 data_path = testing.data_path(download=False)
 subject = "sample"
@@ -41,32 +39,23 @@ def test_segment_display(renderer_interactive_pyvistaqt):
 
     # test no seghead, fsaverage doesn't have seghead
     with pytest.warns(RuntimeWarning, match="`seghead` not found"):
-        with catch_logging() as log:
-            gui = VolumeSegmenter(
-                subject="fsaverage", subjects_dir=subjects_dir, verbose=True
-            )
-    log = log.getvalue()
-    assert "using marching cubes" in log
-    gui.close()
+        gui = VolumeSegmenter(
+            subject="fsaverage", subjects_dir=subjects_dir, verbose=True
+        )
 
     # test functions
-    with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
-        gui = SliceBrowser(subject=subject, subjects_dir=subjects_dir)
+    gui.set_RAS([25.37, 0.00, 34.18])
 
-    # test RAS
-    gui._RAS_textbox.setText("10 10 10")
-    gui._RAS_textbox.focusOutEvent(event=None)
-    assert_allclose(gui._ras, [10, 10, 10])
+    # test mark
+    gui._mark()
+    assert abs(np.nansum(gui._vol_img) - 250) < 3
 
-    # test vox
-    gui._VOX_textbox.setText("150, 150, 150")
-    gui._VOX_textbox.focusOutEvent(event=None)
-    assert_allclose(gui._ras, [23, 22, 23])
+    # increase tolerance
+    gui.set_tolerance(0.5)
 
-    # test click
-    with use_log_level("debug"):
-        _fake_click(
-            gui._figs[2], gui._figs[2].axes[0], [137, 140], xform="data", kind="release"
-        )
-    assert_allclose(gui._ras, [10, 12, 23])
-    gui.close()
+    # check more voxels marked
+    gui._mark()
+    assert np.nansum(gui._vol_img) > 253
+
+    # check smooth
+    gui.set_smooth(0.7)

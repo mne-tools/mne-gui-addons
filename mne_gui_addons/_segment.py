@@ -304,6 +304,16 @@ class VolumeSegmenter(SliceBrowser):
         if vmax is not None:
             self._img_max_slider.setValue(vmax)
 
+    def set_smooth(self, smooth):
+        """Set the smoothness of the 3D renderering of the segmented volume.
+
+        Parameters
+        ----------
+        smooth : float [0, 1]
+            The smoothness of the 3D rendering.
+        """
+        self._smooth_slider.setValue(int(round(smooth * 100)))
+
     def _update_img_scale(self):
         """Update base image slider values."""
         new_min = self._img_min_slider.value()
@@ -448,7 +458,7 @@ class VolumeSegmenter(SliceBrowser):
             verts, tris = _marching_cubes(self._vol_img, [1], smooth=smooth)[0]
             verts = apply_trans(self._vox_scan_ras_t, verts)  # vox -> scanner RAS
             verts = apply_trans(
-                self._mri_scan_ras_vox_t, verts
+                self._mr_scan_ras_vox_t, verts
             )  # scanner RAS -> mri vox
             verts = apply_trans(self._mr_vox_mri_t, verts)  # mr voxels -> surface RAS
             self._vol_actor = self._renderer.mesh(
