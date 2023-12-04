@@ -20,12 +20,8 @@ and examples for a wide variety of topics, contributing guidelines, and an API
 reference.
 
 
-Forum
-^^^^^^
-
-The `user forum`_ is the best place to ask questions about MNE-Python usage or
-the contribution process. The forum also features job opportunities and other
-announcements.
+Reporting
+^^^^^^^^^
 
 If you find a bug or have an idea for a new feature that should be added,
 please use the
