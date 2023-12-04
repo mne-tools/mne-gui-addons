@@ -103,7 +103,6 @@ class VolumeSegmenter(SliceBrowser):
             base_image=base_image,
             subject=subject,
             subjects_dir=subjects_dir,
-            check_aligned=False,
         )
 
         self._vol_img = np.zeros(self._base_data.shape) * np.nan
