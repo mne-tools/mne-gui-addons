@@ -64,12 +64,12 @@ def test_slice_browser_display(renderer_interactive_pyvistaqt):
     # test vox
     gui._VOX_textbox.setText("150, 150, 150")
     gui._VOX_textbox.focusOutEvent(event=None)
-    assert_allclose(gui._ras, [-27.27362 ,  31.039082, -49.287958], atol=0.1)
+    assert_allclose(gui._ras, [-27.27362, 31.039082, -49.287958], atol=0.1)
 
     # test click
     with use_log_level("debug"):
         _fake_click(
             gui._figs[2], gui._figs[2].axes[0], [137, 140], xform="data", kind="release"
         )
-    assert_allclose(gui._ras, [4.726382,  21.039079, -49.287956], atol=0.1)
+    assert_allclose(gui._ras, [4.726382, 21.039079, -49.287956], atol=0.1)
     gui.close()
