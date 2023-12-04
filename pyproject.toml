@@ -64,6 +64,9 @@ testpaths = [
     "mne_gui_addons",
 ]
 junit_family = "xunit2"
+markers = [
+    "allow_unclosed_pyside2: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
+]
 
 [tool.ruff]
 exclude = ["dist/" , "build/"]
