@@ -3,6 +3,7 @@ import os
 import sys
 import warnings
 
+import pyvista
 import mne_gui_addons
 
 faulthandler.enable()
@@ -94,10 +95,6 @@ numpydoc_validation_checks = {
 numpydoc_validation_exclude = {  # set of regex
     r"mne\.utils\.deprecated",
 }
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    import pyvista
 pyvista.OFF_SCREEN = False
 pyvista.BUILDING_GALLERY = True
 sphinx_gallery_conf = {
@@ -167,3 +164,9 @@ htmlhelp_basename = "mne-gui-addons-doc"
 bibtex_bibfiles = ["./references.bib"]
 bibtex_style = "unsrt"
 bibtex_footbibliography_header = ""
+
+# ignore warnings
+warnings.filterwarnings(
+    "ignore",
+    message="The `pyvista.plotting.plotting` module has been deprecated.*",
+)
