@@ -342,8 +342,11 @@ class SliceBrowser(QMainWindow):
                 "3D visualization panel"
             )
             # in this case, leave in voxel coordinates
+            thresh = np.quantile(self._base_data, 0.95)
+            if not (self._base_data < thresh).any():
+                thresh = self._base_data.min()
             rr, tris = _marching_cubes(
-                np.where(self._base_data < np.quantile(self._base_data, 0.95), 0, 1),
+                np.where(self._base_data <= thresh, 0, 1),
                 [1],
             )[0]
             rr = apply_trans(self._vox_scan_ras_t, rr)  # base image vox -> RAS

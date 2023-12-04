@@ -23,6 +23,7 @@ dependencies = [
     "dipy>=1.4",
     "traitlets",
     "setuptools >=65",
+    "imageio-ffmpeg>=0.4.1",
 ]
 dynamic = ["version"]
 

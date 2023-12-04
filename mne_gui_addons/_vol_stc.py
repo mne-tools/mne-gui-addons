@@ -830,7 +830,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             if isinstance(inst, EpochsTFR):
                 inst_data = inst.data
             elif isinstance(inst, BaseEpochs):
-                inst_data = inst.get_data()
+                inst_data = inst.get_data(copy=True)
             else:
                 inst_data = inst.data[None]  # new axis for single epoch
             # convert to power or ITC for group
