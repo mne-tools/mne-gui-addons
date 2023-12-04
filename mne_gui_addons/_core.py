@@ -336,7 +336,7 @@ class SliceBrowser(QMainWindow):
                 "button_release_event", partial(self._on_click, axis=axis)
             )
         # add head and brain in mm (convert from m)
-        if self._head is None:
+        if self._head is None or not self._base_mr_aligned:
             logger.debug(
                 "Using marching cubes on the base image for the "
                 "3D visualization panel"
@@ -367,7 +367,7 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
-        if self._lh is not None and self._rh is not None:
+        if self._lh is not None and self._rh is not None and self._base_mr_aligned:
             self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
