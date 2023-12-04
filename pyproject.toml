@@ -66,6 +66,7 @@ testpaths = [
 junit_family = "xunit2"
 markers = [
     "allow_unclosed_pyside2: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
+    "allow_unclosed: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
 ]
 
 [tool.ruff]
