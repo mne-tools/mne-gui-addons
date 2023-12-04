@@ -1,8 +1,8 @@
 import faulthandler
 import os
 import sys
+import warnings
 
-import pyvista
 import mne_gui_addons
 
 faulthandler.enable()
@@ -94,6 +94,10 @@ numpydoc_validation_checks = {
 numpydoc_validation_exclude = {  # set of regex
     r"mne\.utils\.deprecated",
 }
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    import pyvista
 pyvista.OFF_SCREEN = False
 pyvista.BUILDING_GALLERY = True
 sphinx_gallery_conf = {
