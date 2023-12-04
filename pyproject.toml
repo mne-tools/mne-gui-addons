@@ -2,7 +2,7 @@
 name = "mne-gui-addons"
 description = "MNE-Python GUI addons."
 readme = "README.rst"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {file = "LICENSE"}
 keywords = ["science", "neuroscience", "psychology"]
 authors = [
@@ -64,6 +64,10 @@ testpaths = [
     "mne_gui_addons",
 ]
 junit_family = "xunit2"
+markers = [
+    "allow_unclosed_pyside2: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
+    "allow_unclosed: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
+]
 
 [tool.ruff]
 exclude = ["dist/" , "build/"]

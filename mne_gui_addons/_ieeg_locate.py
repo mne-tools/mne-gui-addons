@@ -31,14 +31,18 @@ from ._core import SliceBrowser
 from mne.channels import make_dig_montage
 from mne.surface import _voxel_neighbors
 from mne.transforms import apply_trans, _get_trans, invert_transform
-from mne.utils import logger, _validate_type, verbose
+from mne.utils import logger, _validate_type, verbose, warn
 from mne import pick_types
 
 _CH_PLOT_SIZE = 1024
+_DEFAULT_RADIUS = 2
 _RADIUS_SCALAR = 0.4
 _TUBE_SCALAR = 0.1
 _BOLT_SCALAR = 30  # mm
 _CH_MENU_WIDTH = 30 if platform.system() == "Windows" else 15
+_VOXEL_NEIGHBORS_THRESH = 0.75
+_SEARCH_ANGLE_THRESH = np.deg2rad(30)
+_MISSING_PROP_OKAY = 0.25
 
 # 20 colors generated to be evenly spaced in a cube, worked better than
 # matplotlib color cycle
@@ -90,6 +94,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         subject=None,
         subjects_dir=None,
         groups=None,
+        targets=None,
         show=True,
         verbose=None,
     ):
@@ -105,11 +110,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         # store info for modification
         self._info = info
         self._seeg_idx = pick_types(self._info, meg=False, seeg=True)
+        self._ecog_idx = pick_types(self._info, meg=False, ecog=True)
         self._verbose = verbose
 
         # channel plotting default parameters
         self._ch_alpha = 0.5
-        self._radius = int(_CH_PLOT_SIZE // 100)  # starting 1/100 of image
+        self._radius = _DEFAULT_RADIUS
 
         # initialize channel data
         self._ch_index = 0
@@ -137,6 +143,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         super(IntracranialElectrodeLocator, self).__init__(
             base_image=base_image, subject=subject, subjects_dir=subjects_dir
         )
+
+        if targets:
+            self.auto_find_contacts(targets)
 
         # set current position as current contact location if exists
         if not np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
@@ -233,12 +242,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
-            if proj or dist < self._radius:
+            if proj or dist <= self._radius:
                 group = self._groups[name]
-                r = (
-                    self._radius
-                    if proj
-                    else self._radius - np.round(abs(dist)).astype(int)
+                r = int(
+                    round(
+                        (self._radius if proj else self._radius - abs(dist))
+                        * _CH_PLOT_SIZE
+                        / self._voxel_sizes[axis]
+                    )
                 )
                 xf, yf = (xyz / vxyz)[list(self._xy_idx[axis])]
                 ch_image = color_ch_radius(ch_image, xf, yf, group, r)
@@ -425,6 +436,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _configure_status_bar(self, hbox=None):
         hbox = QHBoxLayout() if hbox is None else hbox
 
+        self._auto_complete_button = QPushButton("Auto Complete")
+        self._auto_complete_button.released.connect(self._auto_mark_group)
+        hbox.addWidget(self._auto_complete_button)
+
         hbox.addStretch(3)
 
         self._toggle_show_mip_button = QPushButton("Show Max Intensity Proj")
@@ -475,6 +490,326 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     self._groups[name] = i
                     base_names[base_name] = i
                     i += 1
+
+    def _deduplicate_local_maxima(self, local_maxima):
+        """De-duplicate peaks by finding center of mass of high-intensity voxels."""
+        local_maxima2 = list()
+        for local_max in local_maxima:
+            neighbors = _voxel_neighbors(
+                local_max,
+                self._ct_data,
+                thresh=_VOXEL_NEIGHBORS_THRESH,
+                voxels_max=self._radius**3,
+                use_relative=True,
+            )
+            loc = np.array(list(neighbors)).mean(axis=0)
+            if not local_maxima2 or np.min(
+                np.linalg.norm(np.array(local_maxima2) - loc, axis=1)
+            ) > np.sqrt(
+                3
+            ):  # must be more than (1, 1, 1) voxel away
+                local_maxima2.append(loc)
+        return np.array(local_maxima2)
+
+    def _find_local_maxima(self, target, check_nearest=5, max_search_radius=50):
+        target_vox = (
+            apply_trans(self._scan_ras_ras_vox_t, target * 1000).round().astype(int)
+        )
+        search_radius = 1
+        local_maxima = None
+        while local_maxima is None or local_maxima.shape[0] < check_nearest:
+            check_voxels = self._ct_maxima[
+                tuple(
+                    slice(
+                        target_vox[i] - search_radius,
+                        target_vox[i] + search_radius,
+                    )
+                    for i in range(3)
+                )
+            ]
+            local_maxima = (
+                np.array(np.where(~np.isnan(check_voxels))).T
+                + target_vox
+                - search_radius
+            )
+            local_maxima = local_maxima[
+                np.argsort(
+                    [
+                        np.linalg.norm(local_max - target_vox)
+                        for local_max in local_maxima
+                    ]
+                )
+            ]
+            local_maxima = self._deduplicate_local_maxima(local_maxima)
+            search_radius += 1
+            if search_radius > max_search_radius:
+                break
+        if search_radius > max_search_radius:
+            return
+        local_maxima = local_maxima[
+            np.argsort(np.linalg.norm(local_maxima - target_vox, axis=1))
+        ]
+        return local_maxima
+
+    def _auto_find_line(self, tv, r, max_search_radius=50, voxel_tol=2):
+        """Look for local maxima on a line."""
+        # move in that direction and count to number of contact in group
+        locs = [tuple(tv)]
+        for direction in (1, -1):
+            t = direction
+            rr = r.copy()  # modify for course correction
+            # stop when all the contacts or found or you have moved more than
+            # max_search radius without finding another one
+            while abs(t) < (
+                max_search_radius
+                if direction == 1 or len(locs) < 2
+                else 2 * np.linalg.norm(np.array(locs[1]) - np.array(locs[0]))
+            ):
+                check_vox = (
+                    (locs[-1 if direction == 1 else 0] + t * rr).round().astype(int)
+                )
+                next_locs = (
+                    np.array(
+                        np.where(
+                            ~np.isnan(
+                                self._ct_maxima[
+                                    tuple(
+                                        slice(
+                                            check_vox[i] - voxel_tol,
+                                            check_vox[i] + voxel_tol,
+                                        )
+                                        for i in range(3)
+                                    )
+                                ]
+                            )
+                        )
+                    ).T
+                    + check_vox
+                    - voxel_tol
+                )
+                next_locs = self._deduplicate_local_maxima(next_locs)
+                for next_loc in next_locs:
+                    # must be one full voxel away (sqrt(3)) from all other contacts
+                    if np.min(
+                        [np.linalg.norm(next_loc - loc) for loc in locs]
+                    ) > np.sqrt(3):
+                        # update the direction to account for bent electrodes and grids contoured to the brain
+                        rr_tmp = next_loc - np.array(
+                            locs[-1] if direction == 1 else locs[0]
+                        )
+                        rr_tmp /= np.linalg.norm(rr_tmp)  # normalize
+                        # must not change angle by more than threshold
+                        if (
+                            np.arccos(np.clip(np.dot(rr_tmp, rr), -1, 1))
+                            < _SEARCH_ANGLE_THRESH
+                        ):
+                            t = 0
+                            rr = rr_tmp
+                            locs.insert(
+                                len(locs) if direction == 1 else 0, tuple(next_loc)
+                            )
+                            break
+                t += direction
+        return locs
+
+    def _auto_find_grid(
+        self, tv, r, check_nearest=5, max_search_radius=50, voxel_tol=2
+    ):
+        """Automatically find a series of lines to form a grid."""
+        # first, find first line of contacts
+        locs = self._auto_find_line(
+            tv, r, max_search_radius=max_search_radius, voxel_tol=voxel_tol
+        )
+        if len(locs) < 3:
+            return []
+        tv = np.array(locs[0])  # re-pick target value in case shifted to second contact
+        local_maxima = self._find_local_maxima(
+            apply_trans(self._ras_vox_scan_ras_t, tv) / 1000,
+            check_nearest=check_nearest,
+            max_search_radius=max_search_radius,
+        )
+        local_maxima = [
+            loc
+            for loc in local_maxima
+            if np.min([np.linalg.norm(loc - loc2) for loc2 in locs]) > 1
+        ]
+        # next fine a line of contacts in a different direction
+        for tv2 in local_maxima:
+            # find specified direction vector/direction vector to next contact
+            r2 = (tv2 - tv) / np.linalg.norm(tv2 - tv)
+            locs2 = self._auto_find_line(
+                tv, r2, max_search_radius=max_search_radius, voxel_tol=voxel_tol
+            )
+            if len(locs2) > 3:
+                break
+        if len(locs2) < 3:
+            return locs  # only found a line
+        grid = [locs]
+        for tv2 in locs2[1:]:  # loop over perpendicular line to find each next line
+            locs3 = self._auto_find_line(
+                tv2, r, max_search_radius=max_search_radius, voxel_tol=voxel_tol
+            )
+            if locs3:
+                grid.append(locs3)
+        n = int(round(np.median([len(row) for row in grid])))
+        # flatten, homogenize row lengths
+        return [
+            loc
+            for row in grid
+            for loc in (
+                row[:n]
+                if len(row) >= n
+                else row + [(np.nan, np.nan, np.nan)] * (n - len(row))
+            )
+        ]
+
+    def auto_find_contacts(
+        self,
+        targets,
+        check_nearest=5,
+        max_search_radius="auto",
+        voxel_tol=2,
+    ):
+        """Try automatically finding contact locations from targets.
+
+        Parameters
+        ----------
+        targets : dict
+            Keys are names of groups (electrodes/grids) and values are target and
+            entry (optional) locations in scanner RAS with units of meterse.
+        check_nearest : int
+            The number of nearest neighbors to check for completing lines. Increase
+            if locations are not found because artifactual high-intensity areas
+            are causing the wrong line directions.
+        max_search_radius : int | 'auto'
+            The maximum distance to search for a high-intensity voxel away from
+            the last point found. ``auto`` uses 50 for sEEG in order to find
+            electrodes across spanning gaps and 10 for ECoG so as not to be
+            confused by all the extra points (especially if there are two grids).
+        voxel_tol : int
+            The number of voxels away from the line local maxima are allowed to
+            be in order to be marked.
+        """
+        _validate_type(targets, (dict,), "targets")
+        auto_max_search_radius = max_search_radius == "auto"
+        self._update_ct_maxima()
+        for elec, target in targets.items():
+            if len(target) == 2:
+                target, entry = target
+            else:
+                entry = None
+            if len(target) != 3 or (entry is not None and len(entry) != 3):
+                warn(
+                    f"Skipping {elec}, expected 3 coordinates for target, "
+                    f"got {target}"
+                    + ("" if entry is None else f" and for entry, got {entry}")
+                )
+                continue
+            names = [
+                name
+                for name in self._chs
+                if elec in name
+                and all([letter.isdigit() for letter in name.replace(elec, "")])
+            ]
+            is_ecog = all(
+                [self._info.ch_names.index(name) in self._ecog_idx for name in names]
+            )
+            if auto_max_search_radius:
+                max_search_radius = 10 if is_ecog else 50
+            if not names or not all(
+                [np.isnan(self._chs[name]).all() for name in names]
+            ):
+                warn(f"Skipping {elec}, channel positions for {names} already marked")
+                continue
+            # first, find local maxima nearest the target
+            local_maxima = self._find_local_maxima(
+                target, check_nearest=check_nearest, max_search_radius=max_search_radius
+            )
+            if local_maxima is None:
+                warn(f"No nearby local maxima found, skipping {elec}")
+                continue
+            # next, find all local maxima on a line with target voxel
+            if entry is not None:
+                v = apply_trans(self._scan_ras_ras_vox_t, entry * 1000) - apply_trans(
+                    self._scan_ras_ras_vox_t, target * 1000
+                )
+                v /= np.linalg.norm(v)
+            for i, tv in enumerate(local_maxima):  # try neartest sequentially
+                # only try entry if given, otherwise try other local maxima as direction vectors
+                for tv2 in local_maxima[i + 1 :] if entry is None else [tv + v]:
+                    # find specified direction vector/direction vector to next contact
+                    r = (tv2 - tv) / np.linalg.norm(tv2 - tv)
+                    if is_ecog:
+                        locs = self._auto_find_grid(
+                            tv,
+                            r,
+                            check_nearest=check_nearest,
+                            max_search_radius=max_search_radius,
+                            voxel_tol=voxel_tol,
+                        )
+                    else:
+                        locs = self._auto_find_line(
+                            tv,
+                            r,
+                            max_search_radius=max_search_radius,
+                            voxel_tol=voxel_tol,
+                        )
+
+                    if (len(names) - len(locs)) / len(
+                        names
+                    ) < _MISSING_PROP_OKAY:  # quit search if 75% found
+                        break
+                if (len(names) - len(locs)) / len(
+                    names
+                ) < _MISSING_PROP_OKAY:  # quit search if 75% found
+                    break
+
+            if len(names) - len(locs) > 1:
+                warn(f"{elec} automatic search failed, not marking")
+                continue
+
+            # assign locations
+            for name, loc in zip(names, locs):
+                if not np.isnan(loc).any():
+                    vox = apply_trans(self._ras_vox_scan_ras_t, loc)
+                    self._chs[name][:] = apply_trans(
+                        self._scan_ras_mri_t, vox
+                    )  # to surface RAS
+                    self._color_list_item(name)
+        self._save_ch_coords()
+
+    def _auto_mark_group(self):
+        """Automatically mark the current group."""
+        locs = [
+            self._chs[name]
+            for name in self._chs
+            if self._groups[name] == self._groups[self._ch_names[self._ch_index]]
+            and not np.isnan(self._chs[name]).any()
+        ]
+        names = [
+            name
+            for name in self._groups
+            if self._groups[name] == self._groups[self._ch_names[self._ch_index]]
+        ]
+        if len(locs) > 1:
+            if self._ch_index in self._ecog_idx:
+                locs = self._auto_find_grid(locs[0], locs[1] - locs[0])
+            else:
+                locs = self._auto_find_line(locs[0], locs[1] - locs[0])
+            # assign locations
+            for name, loc in zip(names, locs):
+                vox = apply_trans(self._ras_vox_scan_ras_t, loc)
+                self._chs[name][:] = apply_trans(
+                    self._scan_ras_mri_t, vox
+                )  # to surface RAS
+                self._color_list_item(name)
+            self._save_ch_coords()
+        else:
+            QMessageBox.information(
+                self,
+                "Not enough contacts",
+                f"{len(locs)} contacts marked for this group need 2 or more",
+            )
 
     def _update_lines(self, group, only_2D=False):
         """Draw lines that connect the points in a group."""
@@ -634,15 +969,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._scan_ras_mri_t, self._ras
             )  # stored as surface RAS
         else:
-            shape = np.mean(self._voxel_sizes)  # Freesurfer shape (256)
-            voxels_max = int(
-                4 / 3 * np.pi * (shape * self._radius / _CH_PLOT_SIZE) ** 3
-            )
             neighbors = _voxel_neighbors(
                 self._vox,
                 self._ct_data,
-                thresh=0.5,
-                voxels_max=voxels_max,
+                thresh=_VOXEL_NEIGHBORS_THRESH,
+                voxels_max=self._radius**3,
                 use_relative=True,
             )
             self._chs[name][:] = apply_trans(  # to surface RAS
@@ -721,7 +1052,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Update CT and channel images when general changes happen."""
         self._update_ch_images(axis=axis)
         self._update_mri_images(axis=axis)
-        super()._update_images()
+        self._update_ct_images(axis=axis)
+        if draw:
+            self._draw(axis)
 
     def _update_ct_scale(self):
         """Update CT min slider value."""
@@ -767,17 +1100,20 @@ class IntracranialElectrodeLocator(SliceBrowser):
             "Help:\n'm': mark channel location\n"
             "'r': remove channel location\n"
             "'b': toggle viewing of brain in T1\n"
+            "'c': auto-complete contact marking (must have two marked)"
             "'+'/'-': zoom\nleft/right arrow: left/right\n"
             "up/down arrow: superior/inferior\n"
             "left angle bracket/right angle bracket: anterior/posterior",
         )
 
-    def _update_ct_maxima(self):
+    def _update_ct_maxima(self, ct_thresh=0.95):
         """Compute the maximum voxels based on the current radius."""
         self._ct_maxima = (
             maximum_filter(self._ct_data, (self._radius,) * 3) == self._ct_data
         )
-        self._ct_maxima[self._ct_data <= np.median(self._ct_data)] = False
+        self._ct_maxima[self._ct_data <= self._ct_data.max() * ct_thresh] = False
+        if self._mri_data is not None:
+            self._ct_maxima[self._mri_data == 0] = False
         self._ct_maxima = np.where(self._ct_maxima, 1, np.nan)  # transparent
 
     def _toggle_show_mip(self):
@@ -898,3 +1234,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         if event.text() == "b":
             self._toggle_show_brain()
+
+        if event.text() == "c":
+            self._auto_mark_group()
