@@ -147,15 +147,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if targets:
             self.auto_find_contacts(targets)
 
-        # set current position as current contact location if exists
-        if not np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
-            self._set_ras(
-                apply_trans(
-                    self._mri_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
-                ),
-                update_plots=False,
-            )
-
         # add plots of contacts on top
         self._plot_ch_images()
 
@@ -166,7 +157,21 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._update_lines(group)
 
         # ready for user
-        self._move_cursors_to_pos()
+        # set current position as (0, 0, 0) surface RAS (center of mass roughly) if no positions
+        if np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
+            self._set_ras(
+                apply_trans(
+                    self._vox_scan_ras_t, apply_trans(self._mri_vox_t, (0, 0, 0))
+                )
+            )
+        # set current position as current contact location if exists
+        else:
+            self._set_ras(
+                apply_trans(
+                    self._mri_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
+                ),
+                update_plots=False,
+            )
         self._ch_list.setFocus()  # always focus on list
 
         if show:
@@ -345,9 +350,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         hbox.addStretch(1)
 
-        self._toggle_brain_button = QPushButton("Show Brain")
-        self._toggle_brain_button.released.connect(self._toggle_show_brain)
-        hbox.addWidget(self._toggle_brain_button)
+        if self._base_mr_aligned:
+            self._toggle_brain_button = QPushButton("Show Brain")
+            self._toggle_brain_button.released.connect(self._toggle_show_brain)
+            hbox.addWidget(self._toggle_brain_button)
 
         hbox.addStretch(1)
 
@@ -1043,7 +1049,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if "mri" in self._images:
             for axis in range(3) if axis is None else [axis]:
                 self._images["mri"][axis].set_data(
-                    np.take(self._mri_data, self._current_slice[axis], axis=axis).T
+                    np.take(self._mr_data, self._current_slice[axis], axis=axis).T
                 )
                 if draw:
                     self._draw(axis)
@@ -1112,8 +1118,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             maximum_filter(self._ct_data, (self._radius,) * 3) == self._ct_data
         )
         self._ct_maxima[self._ct_data <= self._ct_data.max() * ct_thresh] = False
-        if self._mri_data is not None:
-            self._ct_maxima[self._mri_data == 0] = False
+        if self._mr_data is not None:
+            self._ct_maxima[self._mr_data == 0] = False
         self._ct_maxima = np.where(self._ct_maxima, 1, np.nan)  # transparent
 
     def _toggle_show_mip(self):
@@ -1212,7 +1218,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._images["mri"] = list()
             for axis in range(3):
                 mri_data = np.take(
-                    self._mri_data, self._current_slice[axis], axis=axis
+                    self._mr_data, self._current_slice[axis], axis=axis
                 ).T
                 self._images["mri"].append(
                     self._figs[axis]
@@ -1232,7 +1238,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if event.text() == "r":
             self.remove_channel()
 
-        if event.text() == "b":
+        if event.text() == "b" and self._base_mr_aligned:
             self._toggle_show_brain()
 
         if event.text() == "c":
