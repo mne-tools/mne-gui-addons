@@ -19,7 +19,6 @@ dependencies = [
     "pyvista",
     "pyvistaqt",
     "mne",
-    "mne_bids",
     "nibabel",
     "dipy>=1.4",
     "traitlets",
