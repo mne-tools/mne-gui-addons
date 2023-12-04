@@ -1,7 +1,6 @@
 import faulthandler
 import os
 import sys
-import warnings
 
 import pyvista
 import mne_gui_addons
@@ -164,9 +163,3 @@ htmlhelp_basename = "mne-gui-addons-doc"
 bibtex_bibfiles = ["./references.bib"]
 bibtex_style = "unsrt"
 bibtex_footbibliography_header = ""
-
-# ignore warnings
-warnings.filterwarnings(
-    "ignore",
-    message="The `pyvista.plotting.plotting` module has been deprecated.*",
-)
