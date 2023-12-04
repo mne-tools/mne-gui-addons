@@ -420,9 +420,11 @@ class SliceBrowser(QMainWindow):
     def _update_camera(self, render=False):
         """Update the camera position."""
         self._renderer.set_camera(
-            focalpoint=tuple(self._ras),
-            reset_camera=False,
+            focalpoint=tuple(apply_trans(self._scan_ras_mri_t, self._ras)),
+            distance="auto",
         )
+        if render:
+            self._renderer._update()
 
     def _on_scroll(self, event):
         """Process mouse scroll wheel event to zoom."""
