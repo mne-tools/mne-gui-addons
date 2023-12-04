@@ -20,20 +20,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11"]  # Newest supported version (dipy not out for 3.11 yet!)
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11"]
         mne-version: [mne-main]
         qt: [PyQt6]
         include:
-          # macOS (can be moved above once Dipy releases 3.11 wheels)
           - os: macos-latest
             python-version: "3.10"
-            mne-version: mne-main  # TODO: Set back to mne-stable once 1.4 is out (we need its pytest fixtures)
+            mne-version: mne-stable
             qt: PyQt6
           # Old (and PyQt5)
           - os: ubuntu-latest
-            python-version: "3.8"
-            mne-version: mne-main  # TODO: Set back to mne-stable once 1.4 is out (we need its pytest fixtures)
+            python-version: "3.9"
+            mne-version: mne-stable
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
@@ -63,7 +62,7 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: pip install -v ${{ matrix.qt }}
+    - run: pip install -v ${{ matrix.qt }}!=6.6.1 "PyQt6-Qt6!=6.6.1"
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - run: |
