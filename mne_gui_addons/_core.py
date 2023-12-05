@@ -364,8 +364,8 @@ class SliceBrowser(QMainWindow):
             rr = apply_trans(self._mr_scan_ras_vox_t, rr)  # RAS -> MR voxels
             rr = apply_trans(self._mr_vox_mri_t, rr)  # MR voxels -> MR surface RAS
             self._head_actor, _ = self._renderer.mesh(
-                *self._head["rr"].T * 1000,
-                triangles=self._head["tris"],
+                *rr.T * 1000,
+                triangles=tris,
                 color="gray",
                 opacity=0.2,
                 reset_camera=False,
@@ -373,7 +373,7 @@ class SliceBrowser(QMainWindow):
             )
             self._renderer.set_camera(focalpoint=rr.mean(axis=0))
         else:
-            self._renderer.mesh(
+            self._head_actor, _ = self._renderer.mesh(
                 *self._head["rr"].T * 1000,
                 triangles=self._head["tris"],
                 color="gray",
