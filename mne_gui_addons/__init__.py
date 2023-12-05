@@ -27,6 +27,7 @@ def locate_ieeg(
     subject=None,
     subjects_dir=None,
     groups=None,
+    targets=None,
     show=True,
     block=False,
     verbose=None,
@@ -52,6 +53,12 @@ def locate_ieeg(
         like ``LAMY`` precedes a numeric index like ``7``. If the channels
         are formatted improperly, group plotting will work incorrectly.
         Group assignments can be adjusted in the GUI.
+    targets : dict | None
+        An optional dictionary with group (electrode/grid) names as keys
+        and a list containing 1) the planned target location for the first
+        electrode contact and 2) the next contact or planned entry point
+        (for sEEG). Including only the target location is also an option.
+        If not provided, automatic contact locations will not be found.
     show : bool
         Show the GUI if True.
     block : bool
@@ -75,6 +82,7 @@ def locate_ieeg(
         subject=subject,
         subjects_dir=subjects_dir,
         groups=groups,
+        targets=targets,
         show=show,
         verbose=verbose,
     )

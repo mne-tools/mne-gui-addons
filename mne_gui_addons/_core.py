@@ -172,7 +172,7 @@ class SliceBrowser(QMainWindow):
         if self._subject_dir is None:
             # if the recon-all is not finished or the CT is not
             # downsampled to the MRI, the MRI can not be used
-            self._mri_data = None
+            self._mr_data = None
             self._head = None
             self._lh = self._rh = None
         else:
@@ -181,17 +181,21 @@ class SliceBrowser(QMainWindow):
                 if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
                 else "T1"
             )
-            self._mri_data, vox_mri_t, vox_scan_ras_t, ras_vox_scan_ras_t = _load_image(
-                op.join(self._subject_dir, "mri", f"{mri_img}.mgz")
-            )
+            (
+                self._mr_data,
+                self._mr_vox_mri_t,
+                self._mr_vox_scan_ras_t,
+                self._mr_ras_vox_scan_ras_t,
+            ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
 
         # ready alternate base image if provided, otherwise use brain/T1
+        self._base_mr_aligned = True
         if base_image is None:
-            assert self._mri_data is not None
-            self._base_data = self._mri_data
-            self._vox_mri_t = vox_mri_t
-            self._vox_scan_ras_t = vox_scan_ras_t
-            self._ras_vox_scan_ras_t = ras_vox_scan_ras_t
+            assert self._mr_data is not None
+            self._base_data = self._mr_data
+            self._vox_mri_t = self._mr_vox_mri_t
+            self._vox_scan_ras_t = self._mr_vox_scan_ras_t
+            self._ras_vox_scan_ras_t = self._mr_ras_vox_scan_ras_t
         else:
             (
                 self._base_data,
@@ -199,27 +203,28 @@ class SliceBrowser(QMainWindow):
                 self._vox_scan_ras_t,
                 self._ras_vox_scan_ras_t,
             ) = _load_image(base_image)
-            if self._mri_data is not None:
-                if self._mri_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_scan_ras_t, vox_scan_ras_t, rtol=1e-6
+            if self._mr_data is None:
+                # if no Freesurfer subjects directory provided, send 3D
+                # renderings to surface RAS of the base image
+                self._mr_vox_mri_t = self._vox_mri_t
+                self._mr_vox_scan_ras_t = self._vox_scan_ras_t
+                self._mr_ras_vox_scan_ras_t = self._ras_vox_scan_ras_t
+            else:
+                if self._mr_data.shape != self._base_data.shape or not np.allclose(
+                    self._vox_scan_ras_t, self._mr_vox_scan_ras_t, rtol=1e-6
                 ):
-                    raise ValueError(
-                        "Base image is not aligned to MRI, got "
-                        f"Base shape={self._base_data.shape}, "
-                        f"MRI shape={self._mri_data.shape}, "
-                        f"Base affine={vox_scan_ras_t} and "
-                        f"MRI affine={self._vox_scan_ras_t}, "
-                        "please provide an aligned image or do not use the "
-                        "``subject`` and ``subjects_dir`` arguments"
-                    )
+                    self._base_mr_aligned = False
 
         self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
+        self._mr_mri_vox_t = np.linalg.inv(self._mr_vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
-        self._scan_ras_ras_vox_t = np.linalg.inv(
-            self._ras_vox_scan_ras_t
-        )  # to RAS voxels
+        self._mr_scan_ras_vox_t = np.linalg.inv(self._mr_vox_scan_ras_t)
+        self._scan_ras_ras_vox_t = np.linalg.inv(self._ras_vox_scan_ras_t)
+        self._mr_scan_ras_ras_vox_t = np.linalg.inv(self._mr_ras_vox_scan_ras_t)
+
         self._scan_ras_mri_t = np.dot(self._vox_mri_t, self._scan_ras_vox_t)
         self._mri_scan_ras_t = np.dot(self._vox_scan_ras_t, self._mri_vox_t)
+
         self._voxel_sizes = np.array(self._base_data.shape)
         self._voxel_ratios = self._voxel_sizes / self._voxel_sizes.min()
 
@@ -342,32 +347,42 @@ class SliceBrowser(QMainWindow):
                 "button_release_event", partial(self._on_click, axis=axis)
             )
         # add head and brain in mm (convert from m)
-        if self._head is None:
+        if self._head is None or not self._base_mr_aligned:
             logger.debug(
                 "Using marching cubes on the base image for the "
                 "3D visualization panel"
             )
             # in this case, leave in voxel coordinates
+            thresh = np.quantile(self._base_data, 0.95)
+            if not (self._base_data < thresh).any():
+                thresh = self._base_data.min()
             rr, tris = _marching_cubes(
-                np.where(self._base_data < np.quantile(self._base_data, 0.95), 0, 1),
+                np.where(self._base_data <= thresh, 0, 1),
                 [1],
             )[0]
-
-            rr = apply_trans(self._vox_ras_t, rr)
-            self._head["rr"] = rr
-            self._head["tris"] = tris
-
-        self._head_actor, _ = self._renderer.mesh(
-            *self._head["rr"].T * 1000,
-            triangles=self._head["tris"],
-            color="gray",
-            opacity=0.2,
-            reset_camera=False,
-            render=False,
-        )
-        self._renderer.set_camera(focalpoint=self._head["rr"].mean(axis=0))
-        if self._lh is not None and self._rh is not None:
-            self._lh_actor, _ = self._renderer.mesh(
+            rr = apply_trans(self._vox_scan_ras_t, rr)  # base image vox -> RAS
+            rr = apply_trans(self._mr_scan_ras_vox_t, rr)  # RAS -> MR voxels
+            rr = apply_trans(self._mr_vox_mri_t, rr)  # MR voxels -> MR surface RAS
+            self._head_actor, _ = self._renderer.mesh(
+                *self._head["rr"].T * 1000,
+                triangles=self._head["tris"],
+                color="gray",
+                opacity=0.2,
+                reset_camera=False,
+                render=False,
+            )
+            self._renderer.set_camera(focalpoint=rr.mean(axis=0))
+        else:
+            self._renderer.mesh(
+                *self._head["rr"].T * 1000,
+                triangles=self._head["tris"],
+                color="gray",
+                opacity=0.2,
+                reset_camera=False,
+                render=False,
+            )
+        if self._lh is not None and self._rh is not None and self._base_mr_aligned:
+            self._lh_actor, _self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
                 color="gray",
@@ -420,9 +435,11 @@ class SliceBrowser(QMainWindow):
     def _update_camera(self, render=False):
         """Update the camera position."""
         self._renderer.set_camera(
-            focalpoint=tuple(self._ras),
-            reset_camera=False,
+            focalpoint=tuple(apply_trans(self._scan_ras_mri_t, self._ras)),
+            distance="auto",
         )
+        if render:
+            self._renderer._update()
 
     def _on_scroll(self, event):
         """Process mouse scroll wheel event to zoom."""
