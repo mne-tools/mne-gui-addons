@@ -382,7 +382,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
         if self._lh is not None and self._rh is not None and self._base_mr_aligned:
-            self._lh_actor, _self._renderer.mesh(
+            self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T * 1000,
                 triangles=self._lh["tris"],
                 color="gray",
