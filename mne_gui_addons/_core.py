@@ -183,9 +183,9 @@ class SliceBrowser(QMainWindow):
             )
             (
                 self._mr_data,
-                self._mr_vox_mri_t,
-                self._mr_vox_scan_ras_t,
-                self._mr_ras_vox_scan_ras_t,
+                mr_vox_mri_t,
+                mr_vox_scan_ras_t,
+                mr_ras_vox_scan_ras_t,
             ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
 
         # ready alternate base image if provided, otherwise use brain/T1
@@ -193,9 +193,9 @@ class SliceBrowser(QMainWindow):
         if base_image is None:
             assert self._mr_data is not None
             self._base_data = self._mr_data
-            self._vox_mri_t = self._mr_vox_mri_t
-            self._vox_scan_ras_t = self._mr_vox_scan_ras_t
-            self._ras_vox_scan_ras_t = self._mr_ras_vox_scan_ras_t
+            self._vox_mri_t = mr_vox_mri_t
+            self._vox_scan_ras_t = mr_vox_scan_ras_t
+            self._ras_vox_scan_ras_t = mr_ras_vox_scan_ras_t
         else:
             (
                 self._base_data,
@@ -203,24 +203,15 @@ class SliceBrowser(QMainWindow):
                 self._vox_scan_ras_t,
                 self._ras_vox_scan_ras_t,
             ) = _load_image(base_image)
-            if self._mr_data is None:
-                # if no Freesurfer subjects directory provided, send 3D
-                # renderings to surface RAS of the base image
-                self._mr_vox_mri_t = self._vox_mri_t
-                self._mr_vox_scan_ras_t = self._vox_scan_ras_t
-                self._mr_ras_vox_scan_ras_t = self._ras_vox_scan_ras_t
-            else:
+            if self._mr_data is not None:
                 if self._mr_data.shape != self._base_data.shape or not np.allclose(
-                    self._vox_scan_ras_t, self._mr_vox_scan_ras_t, rtol=1e-6
+                    self._vox_scan_ras_t, mr_vox_scan_ras_t, rtol=1e-6
                 ):
                     self._base_mr_aligned = False
 
         self._mri_vox_t = np.linalg.inv(self._vox_mri_t)
-        self._mr_mri_vox_t = np.linalg.inv(self._mr_vox_mri_t)
         self._scan_ras_vox_t = np.linalg.inv(self._vox_scan_ras_t)
-        self._mr_scan_ras_vox_t = np.linalg.inv(self._mr_vox_scan_ras_t)
         self._scan_ras_ras_vox_t = np.linalg.inv(self._ras_vox_scan_ras_t)
-        self._mr_scan_ras_ras_vox_t = np.linalg.inv(self._mr_ras_vox_scan_ras_t)
 
         self._scan_ras_mri_t = np.dot(self._vox_mri_t, self._scan_ras_vox_t)
         self._mri_scan_ras_t = np.dot(self._vox_scan_ras_t, self._mri_vox_t)
@@ -247,6 +238,10 @@ class SliceBrowser(QMainWindow):
                     op.join(self._subject_dir, "surf", "lh.seghead")
                 )
                 assert _frame_to_str[self._head["coord_frame"]] == "mri"
+                # transform to scanner RAS
+                self._head["rr"] = apply_trans(
+                    self._mri_scan_ras_t, self._head["rr"] * 1000
+                )
             else:
                 warn(
                     "`seghead` not found, using marching cubes on base image "
@@ -267,8 +262,16 @@ class SliceBrowser(QMainWindow):
             if op.exists(surf_fname.format(hemi="lh")):
                 self._lh = _read_mri_surface(surf_fname.format(hemi="lh"))
                 assert _frame_to_str[self._lh["coord_frame"]] == "mri"
+                # convert to scanner RAS
+                self._lh["rr"] = apply_trans(
+                    self._mri_scan_ras_t, self._lh["rr"] * 1000
+                )
                 self._rh = _read_mri_surface(surf_fname.format(hemi="rh"))
                 assert _frame_to_str[self._rh["coord_frame"]] == "mri"
+                # convert to scanner RAS
+                self._rh["rr"] = apply_trans(
+                    self._mri_scan_ras_t, self._rh["rr"] * 1000
+                )
             else:
                 warn(
                     "`pial` surface not found, skipping adding to 3D "
@@ -360,9 +363,7 @@ class SliceBrowser(QMainWindow):
                 np.where(self._base_data <= thresh, 0, 1),
                 [1],
             )[0]
-            rr = apply_trans(self._vox_scan_ras_t, rr)  # base image vox -> RAS
-            rr = apply_trans(self._mr_scan_ras_vox_t, rr)  # RAS -> MR voxels
-            rr = apply_trans(self._mr_vox_mri_t, rr)  # MR voxels -> MR surface RAS
+            rr = apply_trans(self._ras_vox_scan_ras_t, rr)  # base image vox -> RAS
             self._head_actor, _ = self._renderer.mesh(
                 *rr.T * 1000,
                 triangles=tris,
@@ -371,10 +372,9 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
-            self._renderer.set_camera(focalpoint=rr.mean(axis=0))
         else:
             self._head_actor, _ = self._renderer.mesh(
-                *self._head["rr"].T * 1000,
+                *self._head["rr"].T,
                 triangles=self._head["tris"],
                 color="gray",
                 opacity=0.2,
@@ -383,7 +383,7 @@ class SliceBrowser(QMainWindow):
             )
         if self._lh is not None and self._rh is not None and self._base_mr_aligned:
             self._lh_actor, _ = self._renderer.mesh(
-                *self._lh["rr"].T * 1000,
+                *self._lh["rr"].T,
                 triangles=self._lh["tris"],
                 color="gray",
                 opacity=0.2,
@@ -391,7 +391,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
             self._rh_actor, _ = self._renderer.mesh(
-                *self._rh["rr"].T * 1000,
+                *self._rh["rr"].T,
                 triangles=self._rh["tris"],
                 color="gray",
                 opacity=0.2,
@@ -434,10 +434,7 @@ class SliceBrowser(QMainWindow):
 
     def _update_camera(self, render=False):
         """Update the camera position."""
-        self._renderer.set_camera(
-            focalpoint=tuple(apply_trans(self._scan_ras_mri_t, self._ras)),
-            distance="auto",
-        )
+        self._renderer.set_camera(focalpoint=tuple(self._ras), distance="auto")
         if render:
             self._renderer._update()
 
