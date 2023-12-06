@@ -250,21 +250,15 @@ class VolumeSegmenter(SliceBrowser):
             "Applying Brainmask",
             "Applying the brainmask, this will take ~30 seconds",
         )
-        img_data, _, vox_scan_ras_t, _ = _load_image(
+        img_data, _, _, ras_vox_scan_ras_t, _ = _load_image(
             op.join(self._subject_dir, "mri", "brainmask.mgz")
         )
-        idxs = np.meshgrid(
-            np.arange(self._base_data.shape[0]),
-            np.arange(self._base_data.shape[1]),
-            np.arange(self._base_data.shape[2]),
-            indexing="ij",
-        )
-        idxs = np.array(idxs)  # (3, *image_data.shape)
+        idxs = np.indices(self._base_data.shape)
         idxs = np.transpose(idxs, [1, 2, 3, 0])  # (*image_data.shape, 3)
         idxs = idxs.reshape(-1, 3)  # (n_voxels, 3)
-        idxs = apply_trans(self._vox_scan_ras_t, idxs)  # vox -> scanner RAS
+        idxs = apply_trans(self._ras_vox_scan_ras_t, idxs)  # vox -> scanner RAS
         idxs = apply_trans(
-            np.linalg.inv(vox_scan_ras_t), idxs
+            np.linalg.inv(ras_vox_scan_ras_t), idxs
         )  # scanner RAS -> mri vox
         idxs = idxs.round().astype(int)  # round to nearest voxel
         brain = set([(x, y, z) for x, y, z in np.array(np.where(img_data > 0)).T])
@@ -456,11 +450,7 @@ class VolumeSegmenter(SliceBrowser):
         if self._vol_coords:
             smooth = self._smooth_slider.value() / 100
             verts, tris = _marching_cubes(self._vol_img, [1], smooth=smooth)[0]
-            verts = apply_trans(self._vox_scan_ras_t, verts)  # vox -> scanner RAS
-            verts = apply_trans(
-                self._mr_scan_ras_vox_t, verts
-            )  # scanner RAS -> mri vox
-            verts = apply_trans(self._mr_vox_mri_t, verts)  # mr voxels -> surface RAS
+            verts = apply_trans(self._ras_vox_scan_ras_t, verts)  # vox -> scanner RAS
             self._vol_actor = self._renderer.mesh(
                 *verts.T,
                 tris,

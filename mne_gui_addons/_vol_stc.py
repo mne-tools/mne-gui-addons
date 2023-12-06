@@ -1348,7 +1348,6 @@ class VolSourceEstimateViewer(SliceBrowser):
             azimuth=azimuth,
             elevation=elevation,
             focalpoint=focalpoint,
-            reset_camera=False,
         )
         self._renderer._update()
 
