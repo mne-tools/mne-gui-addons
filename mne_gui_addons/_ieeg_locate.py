@@ -131,12 +131,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 'be in the "head" coordinate frame.'
             )
 
-        # load channels, convert from m to mm
+        self._ch_names = info.ch_names
+        # load channels, leave in "head" coordinate frame until transforms are loaded in super
         self._chs = {
-            name: apply_trans(self._head_mri_t, ch["loc"][:3]) * 1000
-            for name, ch in zip(info.ch_names, info["chs"])
+            name: ch["loc"][:3] for name, ch in zip(info.ch_names, info["chs"])
         }
-        self._ch_names = list(self._chs.keys())
         self._group_channels(groups)
 
         # Initialize GUI
@@ -144,17 +143,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
             base_image=base_image, subject=subject, subjects_dir=subjects_dir
         )
 
+        # convert channel positions to scanner RAS
+        for name, pos in self._chs.items():
+            self._chs[name] = apply_trans(
+                self._mri_scan_ras_t, apply_trans(self._head_mri_t, pos) * 1000
+            )
+
         if targets:
             self.auto_find_contacts(targets)
-
-        # set current position as current contact location if exists
-        if not np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
-            self._set_ras(
-                apply_trans(
-                    self._mri_scan_ras_t, self._chs[self._ch_names[self._ch_index]]
-                ),
-                update_plots=False,
-            )
 
         # add plots of contacts on top
         self._plot_ch_images()
@@ -166,7 +162,19 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._update_lines(group)
 
         # ready for user
-        self._move_cursors_to_pos()
+        # set current position as (0, 0, 0) surface RAS (center of mass roughly) if no positions
+        if np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
+            self._set_ras(
+                apply_trans(
+                    self._vox_scan_ras_t, apply_trans(self._mri_vox_t, (0, 0, 0))
+                )
+            )
+        # set current position as current contact location if exists
+        else:
+            self._set_ras(
+                self._chs[self._ch_names[self._ch_index]],
+                update_plots=False,
+            )
         self._ch_list.setFocus()  # always focus on list
 
         if show:
@@ -201,7 +209,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Configure the sidebar to select channels/contacts."""
         ch_list = QListView()
         ch_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        max_ch_name_len = max([len(name) for name in self._chs])
+        max_ch_name_len = max([len(name) for name in self._ch_names])
         ch_list.setMinimumWidth(max_ch_name_len * _CH_MENU_WIDTH)
         ch_list.setMaximumWidth(max_ch_name_len * _CH_MENU_WIDTH)
         self._ch_list_model = QtGui.QStandardItemModel(ch_list)
@@ -232,14 +240,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ch_image[-(ey + ii[idx[1]]), ex + ii[idx[0]]] = group
             return ch_image
 
-        for name, surf_ras in self._chs.items():
+        for name, ras in self._chs.items():
             # move from middle-centered (half coords positive, half negative)
             # to bottom-left corner centered (all coords positive).
-            if np.isnan(surf_ras).any():
+            if np.isnan(ras).any():
                 continue
-            xyz = apply_trans(
-                self._scan_ras_ras_vox_t, apply_trans(self._mri_scan_ras_t, surf_ras)
-            )
+            xyz = apply_trans(self._scan_ras_ras_vox_t, ras)
             # check if closest to that voxel
             dist = np.linalg.norm(xyz - self._current_slice)
             if proj or dist <= self._radius:
@@ -267,10 +273,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
             if montage
             else dict(ch_pos=dict(), coord_frame="head")
         )
-        for ch in info["chs"]:
+        for ch in self._ch_names:
             # surface RAS-> head and mm->m
-            montage_kwargs["ch_pos"][ch["ch_name"]] = apply_trans(
-                self._mri_head_t, self._chs[ch["ch_name"]].copy() / 1000
+            montage_kwargs["ch_pos"][ch] = apply_trans(
+                self._mri_head_t,
+                apply_trans(self._scan_ras_mri_t, self._chs[ch].copy()) / 1000,
             )
         info.set_montage(make_dig_montage(**montage_kwargs))
 
@@ -345,9 +352,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         hbox.addStretch(1)
 
-        self._toggle_brain_button = QPushButton("Show Brain")
-        self._toggle_brain_button.released.connect(self._toggle_show_brain)
-        hbox.addWidget(self._toggle_brain_button)
+        if self._base_mr_aligned:
+            self._toggle_brain_button = QPushButton("Show Brain")
+            self._toggle_brain_button.released.connect(self._toggle_show_brain)
+            hbox.addWidget(self._toggle_brain_button)
 
         hbox.addStretch(1)
 
@@ -771,10 +779,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             # assign locations
             for name, loc in zip(names, locs):
                 if not np.isnan(loc).any():
-                    vox = apply_trans(self._ras_vox_scan_ras_t, loc)
-                    self._chs[name][:] = apply_trans(
-                        self._scan_ras_mri_t, vox
-                    )  # to surface RAS
+                    # convert to scanner RAS
+                    self._chs[name][:] = apply_trans(self._ras_vox_scan_ras_t, loc)
                     self._color_list_item(name)
         self._save_ch_coords()
 
@@ -798,10 +804,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 locs = self._auto_find_line(locs[0], locs[1] - locs[0])
             # assign locations
             for name, loc in zip(names, locs):
-                vox = apply_trans(self._ras_vox_scan_ras_t, loc)
-                self._chs[name][:] = apply_trans(
-                    self._scan_ras_mri_t, vox
-                )  # to surface RAS
+                # convert to scanner RAS
+                self._chs[name][:] = apply_trans(self._ras_vox_scan_ras_t, loc)
                 self._color_list_item(name)
             self._save_ch_coords()
         else:
@@ -850,15 +854,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )[0]
         if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
             # add 2D lines on each slice plot if in max intensity projection
-            target_vox = apply_trans(
-                self._mri_scan_ras_t,
-                apply_trans(self._scan_ras_ras_vox_t, pos[target_idx]),
-            )
+            target_vox = apply_trans(self._scan_ras_ras_vox_t, pos[target_idx])
             insert_vox = apply_trans(
-                self._mri_scan_ras_t,
-                apply_trans(
-                    self._scan_ras_ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
-                ),
+                self._scan_ras_ras_vox_t, pos[insert_idx] + elec_v * _BOLT_SCALAR
             )
             lines_2D = list()
             for axis in range(3):
@@ -900,7 +898,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
         if not np.isnan(self._chs[name]).any():
-            self._set_ras(apply_trans(self._mri_scan_ras_t, self._chs[name]))
+            self._set_ras(self._chs[name])
             self._zoom(sign=0, draw=True)
             self._update_camera(render=True)
 
@@ -965,19 +963,17 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._ch_index if ch is None else self._ch_names.index(ch)
         ]
         if self._snap_button.text() == "Off":
-            self._chs[name][:] = apply_trans(
-                self._scan_ras_mri_t, self._ras
-            )  # stored as surface RAS
+            self._chs[name][:] = self._ras
         else:
             neighbors = _voxel_neighbors(
-                self._vox,
+                apply_trans(self._scan_ras_ras_vox_t, self._ras),
                 self._ct_data,
                 thresh=_VOXEL_NEIGHBORS_THRESH,
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
-            self._chs[name][:] = apply_trans(  # to surface RAS
-                self._vox_mri_t, np.array(list(neighbors)).mean(axis=0)
+            self._chs[name][:] = apply_trans(
+                self._ras_vox_scan_ras_t, np.array(list(neighbors)).mean(axis=0)
             )
         self._color_list_item()
         self._update_lines(self._groups[name])
@@ -1043,7 +1039,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if "mri" in self._images:
             for axis in range(3) if axis is None else [axis]:
                 self._images["mri"][axis].set_data(
-                    np.take(self._mri_data, self._current_slice[axis], axis=axis).T
+                    np.take(self._mr_data, self._current_slice[axis], axis=axis).T
                 )
                 if draw:
                     self._draw(axis)
@@ -1112,8 +1108,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             maximum_filter(self._ct_data, (self._radius,) * 3) == self._ct_data
         )
         self._ct_maxima[self._ct_data <= self._ct_data.max() * ct_thresh] = False
-        if self._mri_data is not None:
-            self._ct_maxima[self._mri_data == 0] = False
+        if self._base_mr_aligned and self._mr_data is not None:
+            self._ct_maxima[self._mr_data == 0] = False
         self._ct_maxima = np.where(self._ct_maxima, 1, np.nan)  # transparent
 
     def _toggle_show_mip(self):
@@ -1140,7 +1136,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 # add circles for each channel
                 xs, ys, colors = list(), list(), list()
                 for name, ras in self._chs.items():
-                    xyz = self._vox
+                    xyz = apply_trans(self._scan_ras_vox_t, ras)
                     xs.append(xyz[self._xy_idx[axis][0]])
                     ys.append(xyz[self._xy_idx[axis][1]])
                     colors.append(_CMAP(self._groups[name]))
@@ -1212,7 +1208,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._images["mri"] = list()
             for axis in range(3):
                 mri_data = np.take(
-                    self._mri_data, self._current_slice[axis], axis=axis
+                    self._mr_data, self._current_slice[axis], axis=axis
                 ).T
                 self._images["mri"].append(
                     self._figs[axis]
@@ -1232,7 +1228,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if event.text() == "r":
             self.remove_channel()
 
-        if event.text() == "b":
+        if event.text() == "b" and self._base_mr_aligned:
             self._toggle_show_brain()
 
         if event.text() == "c":

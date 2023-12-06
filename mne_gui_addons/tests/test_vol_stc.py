@@ -145,7 +145,7 @@ def test_stc_viewer_display(renderer_interactive_pyvistaqt):
         )
     # test go to max
     viewer._go_to_extreme_button.click()
-    assert_allclose(viewer._ras, [-20, -60, -20], atol=0.01)
+    assert_allclose(viewer._ras, [-25.273603, -50.960915, -47.287962], atol=0.01)
 
     src_coord = viewer._get_src_coord()
     stc_idx = viewer._src_lut[src_coord]
@@ -190,7 +190,7 @@ def test_stc_viewer_display(renderer_interactive_pyvistaqt):
 
     # test go to max
     viewer._go_to_extreme_button.click()
-    assert_allclose(viewer._ras, [-20, -60, -20], atol=0.01)
+    assert_allclose(viewer._ras, [-25.273603, -50.960915, -47.287962], atol=0.01)
 
     src_coord = viewer._get_src_coord()
     stc_idx = viewer._src_lut[src_coord]

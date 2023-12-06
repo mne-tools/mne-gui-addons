@@ -23,9 +23,12 @@ def test_slice_browser_io(renderer_interactive_pyvistaqt):
     nib = pytest.importorskip("nibabel")
     from mne_gui_addons._core import SliceBrowser
 
-    with pytest.raises(ValueError, match="Base image is not aligned to MRI"):
+    data = np.ones((96, 96, 96), dtype=np.float32)
+    data[30:50, 30:50, 30:50] = 2
+
+    with pytest.warns(match="`pial` surface not found"):
         SliceBrowser(
-            nib.MGHImage(np.ones((96, 96, 96), dtype=np.float32), np.eye(4)),
+            nib.MGHImage(data, np.eye(4)),
             subject=subject,
             subjects_dir=subjects_dir,
         )
@@ -56,17 +59,17 @@ def test_slice_browser_display(renderer_interactive_pyvistaqt):
     # test RAS
     gui._RAS_textbox.setText("10 10 10")
     gui._RAS_textbox.focusOutEvent(event=None)
-    assert_allclose(gui._ras, [10, 10, 10])
+    assert_allclose(gui._ras, [10, 10, 10], atol=1e-5)
 
     # test vox
     gui._VOX_textbox.setText("150, 150, 150")
     gui._VOX_textbox.focusOutEvent(event=None)
-    assert_allclose(gui._ras, [23, 22, 23])
+    assert_allclose(gui._ras, [-27.27362, 31.039082, -49.287958], atol=0.1)
 
     # test click
     with use_log_level("debug"):
         _fake_click(
             gui._figs[2], gui._figs[2].axes[0], [137, 140], xform="data", kind="release"
         )
-    assert_allclose(gui._ras, [10, 12, 23])
+    assert_allclose(gui._ras, [4.726382, 21.039079, -49.287956], atol=0.1)
     gui.close()
