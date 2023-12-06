@@ -27,12 +27,12 @@ jobs:
         include:
           - os: macos-latest
             python-version: "3.10"
-            mne-version: mne-stable
+            mne-version: mne-main  # pin to main for import functions until 1.7 release
             qt: PyQt6
           # Old (and PyQt5)
           - os: ubuntu-latest
             python-version: "3.9"
-            mne-version: mne-stable
+            mne-version: mne-main  # pin to main for import functions until 1.7 release
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: pip install -v ${{ matrix.qt }} "PyQt6-Qt6!=6.6.1"
+    - run: pip install -v ${{ matrix.qt }}!=6.6.1 "PyQt6-Qt6!=6.6.1"
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - run: |
