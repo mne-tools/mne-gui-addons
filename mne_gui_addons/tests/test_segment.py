@@ -4,7 +4,6 @@
 # License: BSD-3-clause
 
 import numpy as np
-from numpy.testing import assert_allclose
 
 import pytest
 
@@ -18,7 +17,6 @@ subjects_dir = data_path / "subjects"
 @testing.requires_testing_data
 def test_segment_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the slice browser GUI."""
-    nib = pytest.importorskip("nibabel")
     from mne_gui_addons._segment import VolumeSegmenter
 
     with pytest.warns(match="`pial` surface not found"):
