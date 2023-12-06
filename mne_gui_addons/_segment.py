@@ -299,7 +299,7 @@ class VolumeSegmenter(SliceBrowser):
             self._img_max_slider.setValue(vmax)
 
     def set_smooth(self, smooth):
-        """Set the smoothness of the 3D renderering of the segmented volume.
+        """Set the smoothness of the 3D rendering of the segmented volume.
 
         Parameters
         ----------
