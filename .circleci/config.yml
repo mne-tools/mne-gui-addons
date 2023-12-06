@@ -70,6 +70,7 @@ jobs:
             name: make html
             command: |
               make -C doc html
+            no_output_timeout: 30m
         - store_test_results:
             path: doc/_build/test-results
         - store_artifacts:
