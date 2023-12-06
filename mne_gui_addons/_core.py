@@ -443,6 +443,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
             self._rh_actor, _ = self._renderer.mesh(
+            self._rh_actor, _ = self._renderer.mesh(
                 *self._rh["rr"].T,
                 triangles=self._rh["tris"],
                 color="white",
