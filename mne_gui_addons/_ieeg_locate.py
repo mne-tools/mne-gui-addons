@@ -966,13 +966,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._chs[name][:] = self._ras
         else:
             neighbors = _voxel_neighbors(
-                self._vox,
+                apply_trans(self._scan_ras_ras_vox_t, self._ras),
                 self._ct_data,
                 thresh=_VOXEL_NEIGHBORS_THRESH,
                 voxels_max=self._radius**3,
                 use_relative=True,
             )
-            self._chs[name][:] = apply_trans(  # to surface RAS
+            self._chs[name][:] = apply_trans(
                 self._ras_vox_scan_ras_t, np.array(list(neighbors)).mean(axis=0)
             )
         self._color_list_item()
