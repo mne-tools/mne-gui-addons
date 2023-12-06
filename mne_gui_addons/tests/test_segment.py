@@ -14,9 +14,10 @@ subject = "sample"
 subjects_dir = data_path / "subjects"
 
 
+@pytest.mark.allow_unclosed
 @testing.requires_testing_data
 def test_segment_io(renderer_interactive_pyvistaqt):
-    """Test the input/output of the slice browser GUI."""
+    """Test the input/output of the volume segmenter GUI."""
     from mne_gui_addons._segment import VolumeSegmenter
 
     with pytest.warns(match="`pial` surface not found"):
@@ -30,7 +31,7 @@ def test_segment_io(renderer_interactive_pyvistaqt):
 @pytest.mark.allow_unclosed
 @testing.requires_testing_data
 def test_segment_display(renderer_interactive_pyvistaqt):
-    """Test that the slice browser GUI displays properly."""
+    """Test that the volume segmenter GUI displays properly."""
     pytest.importorskip("nibabel")
     from mne_gui_addons._segment import VolumeSegmenter
 
