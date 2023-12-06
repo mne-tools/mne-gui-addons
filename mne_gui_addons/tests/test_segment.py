@@ -23,7 +23,6 @@ def test_segment_io(renderer_interactive_pyvistaqt):
 
     with pytest.warns(match="`pial` surface not found"):
         VolumeSegmenter(
-            nib.MGHImage(np.ones((96, 96, 96), dtype=np.float32), np.eye(4)),
             subject=subject,
             subjects_dir=subjects_dir,
         )
