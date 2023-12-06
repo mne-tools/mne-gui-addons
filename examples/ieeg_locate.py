@@ -495,6 +495,9 @@ mne_gui.locate_ieeg(
 # :ref:`mne watershed_bem` or :ref:`mne flash_bem`.
 # First, let's plot the localized sensor positions without modification.
 
+# reload original found positions
+raw_ecog = mne.io.read_raw(misc_path / "ecog" / "sample_ecog_ieeg.fif")
+
 # plot projected sensors
 brain_kwargs = dict(cortex="low_contrast", alpha=0.2, background="white")
 brain = mne.viz.Brain(
@@ -536,6 +539,9 @@ brain.show_view(**view_kwargs)
 # to use to define the coordinate frame so that we don't have to manually
 # identify their location. The estimated head->mri ``trans`` was used
 # when the electrode contacts were localized so we need to use it again here.
+
+# reload original found positions
+raw = mne.io.read_raw(misc_path / "ecog" / "sample_ecog_ieeg.fif")
 
 # plot the alignment
 brain = mne.viz.Brain("sample_seeg", subjects_dir=misc_path / "seeg", **brain_kwargs)

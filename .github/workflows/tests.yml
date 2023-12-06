@@ -27,12 +27,12 @@ jobs:
         include:
           - os: macos-latest
             python-version: "3.10"
-            mne-version: mne-stable
+            mne-version: mne-main  # pin to main for import functions until 1.7 release
             qt: PyQt6
           # Old (and PyQt5)
           - os: ubuntu-latest
             python-version: "3.9"
-            mne-version: mne-stable
+            mne-version: mne-main  # pin to main for import functions until 1.7 release
             qt: PyQt5
           # PySide2
           - os: ubuntu-latest
