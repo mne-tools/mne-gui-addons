@@ -541,7 +541,7 @@ brain.show_view(**view_kwargs)
 # when the electrode contacts were localized so we need to use it again here.
 
 # reload original found positions
-raw = mne.io.read_raw(misc_path / "ecog" / "sample_ecog_ieeg.fif")
+raw = mne.io.read_raw(misc_path / "seeg" / "sample_seeg_ieeg.fif")
 
 # plot the alignment
 brain = mne.viz.Brain("sample_seeg", subjects_dir=misc_path / "seeg", **brain_kwargs)
