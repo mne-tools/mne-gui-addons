@@ -56,3 +56,5 @@ def test_segment_display(renderer_interactive_pyvistaqt):
 
     # check smooth
     gui.set_smooth(0.7)
+
+    gui.close()
