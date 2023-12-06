@@ -154,9 +154,9 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
         )
 
     with pytest.raises(ValueError, match="read-only"):
-        gui._ras[:] = apply_trans(
-            gui._mri_scan_ras_t, coords[0]
-        )  # start in the right position
+        gui._ras[:] = coords[0]
+
+    # start in the right position
     gui.set_RAS(apply_trans(gui._mri_scan_ras_t, coords[0]))
     gui.mark_channel()
 
@@ -177,14 +177,14 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
                 kind="release",
             )
         assert_allclose(
-            coord[:2],
-            apply_trans(gui._scan_ras_mri_t, gui._ras)[:2],
+            apply_trans(gui._mri_scan_ras_t, coord)[:2],
+            gui._ras[:2],
             atol=0.1,
             err_msg=f"coords[{ci}][:2]",
         )
         assert_allclose(
-            coord[2],
-            apply_trans(gui._scan_ras_mri_t, gui._ras)[2],
+            apply_trans(gui._mri_scan_ras_t, coord)[2],
+            gui._ras[2],
             atol=2,
             err_msg=f"coords[{ci}][2]",
         )
@@ -197,14 +197,27 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
     gui._ch_index = 0
     gui.set_RAS(apply_trans(gui._mri_scan_ras_t, coords[0]))  # move to first position
     gui.mark_channel()
-    assert np.linalg.norm(coords[0] - gui._chs["LAMY 1"]) < 1.1
+    assert (
+        abs(
+            np.linalg.norm(
+                apply_trans(gui._mri_scan_ras_t, coords[0]) - gui._chs["LAMY 1"]
+            )
+            - 1.03
+        )
+        < 1e-3
+    )
     gui._snap_button.click()
     assert gui._snap_button.text() == "Off"
     # now make sure no snap happens
     gui._ch_index = 0
     gui.set_RAS(apply_trans(gui._mri_scan_ras_t, coords[1] + 1))
     gui.mark_channel()
-    assert np.linalg.norm(coords[1] + 1 - gui._chs["LAMY 1"]) < 1e-3
+    assert (
+        np.linalg.norm(
+            apply_trans(gui._mri_scan_ras_t, coords[1] + 1) - gui._chs["LAMY 1"]
+        )
+        < 1e-3
+    )
     # check that it turns back on
     gui._snap_button.click()
     assert gui._snap_button.text() == "On"
@@ -246,7 +259,7 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
     assert montage is not None
     assert_allclose(
         montage.get_positions()["ch_pos"]["LAMY 1"],
-        [0.00726235, 0.01713514, 0.04167233],
+        [5.276672, -9.030582, 27.302032],
         atol=0.01,
     )
 
@@ -259,15 +272,27 @@ def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coord
 
     # test just target
     gui.auto_find_contacts(targets={"LAMY ": target})
-    assert np.linalg.norm(coords[0] - gui._chs["LAMY 1"]) < 1e-3
-    assert np.linalg.norm(coords[1] - gui._chs["LAMY 2"]) < 1e-3
+    assert (
+        np.linalg.norm(apply_trans(gui._mri_scan_ras_t, coords[0]) - gui._chs["LAMY 1"])
+        < 1e-3
+    )
+    assert (
+        np.linalg.norm(apply_trans(gui._mri_scan_ras_t, coords[1]) - gui._chs["LAMY 2"])
+        < 1e-3
+    )
 
     gui.remove_channel("LAMY 1")
     gui.remove_channel("LAMY 2")
 
     # test with target and entry
     gui.auto_find_contacts(targets={"LAMY ": (target, entry)})
-    assert np.linalg.norm(coords[0] - gui._chs["LAMY 1"]) < 1e-3
-    assert np.linalg.norm(coords[1] - gui._chs["LAMY 2"]) < 1e-3
+    assert (
+        np.linalg.norm(apply_trans(gui._mri_scan_ras_t, coords[0]) - gui._chs["LAMY 1"])
+        < 1e-3
+    )
+    assert (
+        np.linalg.norm(apply_trans(gui._mri_scan_ras_t, coords[1]) - gui._chs["LAMY 2"])
+        < 1e-3
+    )
 
     gui.close()
