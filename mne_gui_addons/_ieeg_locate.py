@@ -37,7 +37,6 @@ from qtpy.QtWidgets import (
 )
 
 from matplotlib.pyplot import Figure, imread
-from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.transforms import Affine2D
 
 from pyvista import vtk_points, ChartMPL
