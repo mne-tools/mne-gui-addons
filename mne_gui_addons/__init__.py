@@ -281,6 +281,54 @@ def view_vol_stc(
     return gui
 
 
+@_verbose
+@_fill_doc
+def segment_volume(
+    base_image=None,
+    subject=None,
+    subjects_dir=None,
+    show=True,
+    block=False,
+    verbose=None,
+):
+    """Locate intracranial electrode contacts.
+
+    Parameters
+    ----------
+    base_image : path-like | nibabel.spatialimages.SpatialImage
+        The image on which to segment the volume. Defaults to the
+        freesurfer T1. Path-like inputs and nibabel image
+        objects are supported.
+    %(subject)s
+    %(subjects_dir)s
+    show : bool
+        Show the GUI if True.
+    block : bool
+        Whether to halt program execution until the figure is closed.
+    %(verbose)s
+
+    Returns
+    -------
+    gui : instance of VolumeSegmenter
+        The graphical user interface (GUI) window.
+    """
+    from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+    from ._segment import VolumeSegmenter
+
+    app = _init_mne_qtapp()
+
+    gui = VolumeSegmenter(
+        base_image=base_image,
+        subject=subject,
+        subjects_dir=subjects_dir,
+        show=show,
+        verbose=verbose,
+    )
+    if block:
+        _qt_app_exec(app)
+    return gui
+
+
 class _GUIScraper(object):
     """Scrape GUI outputs."""
 
@@ -290,12 +338,20 @@ class _GUIScraper(object):
     def __call__(self, block, block_vars, gallery_conf):
         from ._ieeg_locate import IntracranialElectrodeLocator
         from ._vol_stc import VolSourceEstimateViewer
+        from ._segment import VolumeSegmenter
         from sphinx_gallery.scrapers import figure_rst
         from qtpy import QtGui
 
         for gui in block_vars["example_globals"].values():
             if (
-                isinstance(gui, (IntracranialElectrodeLocator, VolSourceEstimateViewer))
+                isinstance(
+                    gui,
+                    (
+                        IntracranialElectrodeLocator,
+                        VolSourceEstimateViewer,
+                        VolumeSegmenter,
+                    ),
+                )
                 and not getattr(gui, "_scraped", False)
                 and gallery_conf["builder_name"] == "html"
             ):
