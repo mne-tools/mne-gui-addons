@@ -1599,7 +1599,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._grid_actors[self._grid_ch_index] = actor
         self._grid_meshes[self._grid_ch_index] = mesh
 
-        self._grid_ch_index = (self._grid_ch_index + step) % self._grid_pos[-1].size
+        self._grid_ch_index = (self._grid_ch_index + step) % self._grid_pos[-1].shape[0]
 
         # remove gray sphere, replace with yellow
         actor, mesh = self._renderer.sphere(

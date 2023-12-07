@@ -365,8 +365,7 @@ class SliceBrowser(QMainWindow):
             )[0]
             rr = apply_trans(self._ras_vox_scan_ras_t, rr)  # base image vox -> RAS
 
-            self._head["rr"] = rr
-            self._head["tris"] = tris
+            self._head = dict(rr=rr, tris=tris)
 
             self._head_actor, _ = self._renderer.mesh(
                 *rr.T,
