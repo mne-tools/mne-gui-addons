@@ -36,4 +36,6 @@ trans = mne.coreg.estimate_head_mri_t("sample_ecog", subjects_dir)
 
 raw.set_montage(None)  # remove macro channels
 
-gui = mne_gui.locate_ieeg(raw.info, trans, subject="sample_ecog", subjects_dir=subjects_dir)
+gui = mne_gui.locate_ieeg(
+    raw.info, trans, subject="sample_ecog", subjects_dir=subjects_dir
+)
