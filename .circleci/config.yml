@@ -42,7 +42,7 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              pip install --upgrade PyQt6!=6.6.1 "PyQt6-Qt6!=6.6.1" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube
+              pip install --upgrade PyQt6!=6.6.1 "PyQt6-Qt6!=6.6.1" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
               pip install -ve ./mne-python .
         - run:
             name: Check Qt
@@ -70,6 +70,7 @@ jobs:
             name: make html
             command: |
               make -C doc html
+            no_output_timeout: 30m
         - store_test_results:
             path: doc/_build/test-results
         - store_artifacts:
