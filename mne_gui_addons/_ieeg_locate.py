@@ -122,6 +122,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # initialize grid data
         self._grid_ch_index = 0
+        self._grid_ch_indices = None
         self._grid_pos = None
         self._grid_actor = None
         self._grid_mesh = None
@@ -1541,7 +1542,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._ch_list.setCurrentIndex(self._ch_list_model.index(self._ch_index, 0))
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
-        self._update_grid_selection()
+        if self._grid_ch_indices is not None:
+            self._update_grid_selection()
         if not np.isnan(self._chs[name]).any():
             self._set_ras(self._chs[name])
             self._zoom(sign=0, draw=True)

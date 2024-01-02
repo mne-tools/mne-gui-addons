@@ -65,6 +65,7 @@ def _fake_CT_coords(skull_size=5, contact_size=2):
     return ct, coords
 
 
+@testing.requires_testing_data
 def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the intracranial location GUI."""
     nib = pytest.importorskip("nibabel")
