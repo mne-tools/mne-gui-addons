@@ -25,20 +25,21 @@ from qtpy.QtWidgets import (
 )
 
 
-def _get_neighbors(loc, image, voxels, val, tol):
+def _get_neighbors(loc, image, val, tol):
     """Find all the neighbors above a threshold near a voxel."""
-    neighbors = set()
+    neighbors = dict()
     for axis in range(len(loc)):
         for i in (-1, 1):
             next_loc = np.array(loc)
             next_loc[axis] += i
             next_loc = tuple(next_loc)
-            if abs(image[next_loc] - val) / val < tol:
-                neighbors.add(next_loc)
+            diff = abs(image[next_loc] - val) / val
+            if diff < tol:
+                neighbors[next_loc] = diff
     return neighbors
 
 
-def _voxel_neighbors(seed, image, tol, max_n_voxels=200):
+def _voxel_neighbors(seed, image, tol, max_n_voxels=200, max_queue=20):
     """Find voxels contiguous with a seed location within a tolerance
 
     Parameters
@@ -49,6 +50,8 @@ def _voxel_neighbors(seed, image, tol, max_n_voxels=200):
         The image to search.
     tol : float
         The tolerance as a percentage.
+    max_n_voxels : int
+        The number of voxels to stop marking once that number has been reached.
 
     Returns
     -------
@@ -58,20 +61,27 @@ def _voxel_neighbors(seed, image, tol, max_n_voxels=200):
     """
     seed = np.array(seed).round().astype(int)
     val = image[tuple(seed)]
-    voxels = neighbors = set([tuple(seed)])
-    while neighbors:
-        next_neighbors = set()
-        for next_loc in neighbors:
-            voxel_neighbors = _get_neighbors(next_loc, image, voxels, val, tol)
-            # prevent looping back to already visited voxels
-            voxel_neighbors = voxel_neighbors.difference(voxels)
-            # add voxels not already visited to search next
-            next_neighbors = next_neighbors.union(voxel_neighbors)
-            # add new voxels that match the criteria to the overall set
-            voxels = voxels.union(voxel_neighbors)
-        neighbors = next_neighbors  # start again checking all new neighbors
-        if len(voxels) > max_n_voxels:
+    voxels = set([tuple(seed)])
+    # fencepost, find neighbors and their distance in intensity
+    neighbors_lut = _get_neighbors(seed, image, val, tol)
+    # sort neighbors by closeness in value to seed
+    neighbors_queue = sorted(neighbors_lut, key=neighbors_lut.get)
+    while neighbors_queue:
+        # add closest neighbor to voxels
+        closest_neighbor = neighbors_queue.pop(0)
+        voxels.add(closest_neighbor)
+        if len(voxels) > max_n_voxels:  # stop if enough found
             break
+        # add neighbors of the most recently added voxel
+        add_neighbors = _get_neighbors(closest_neighbor, image, val, tol)
+        # add neighbors of marked voxel to look up table of differences
+        for neighbor in add_neighbors:
+            if neighbor not in voxels:   # prevent looping back
+                neighbors_lut[neighbor] = add_neighbors[neighbor]
+                for i, neighbor2 in enumerate(neighbors_queue[:max_queue]):
+                    # add to neighbor queue
+                    if neighbors_lut[neighbor] < neighbors_lut[neighbor2]:
+                        neighbors_queue.insert(i, neighbor)
     return voxels
 
 
@@ -398,7 +408,7 @@ class VolumeSegmenter(SliceBrowser):
         self._undo_button.setEnabled(True)
         self._export_button.setEnabled(True)
         voxels = _voxel_neighbors(
-            self._vox,
+            apply_trans(self._scan_ras_ras_vox_t, self._ras),
             self._base_data,
             self._tol_slider.value() / 100,
             self._max_n_voxels_spin_box.value(),

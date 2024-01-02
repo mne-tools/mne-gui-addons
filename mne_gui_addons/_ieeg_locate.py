@@ -464,35 +464,18 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         move_grid_layout.addStretch(1)
 
-        button_layout = [QHBoxLayout(), QHBoxLayout()]
-
-        next_button = QPushButton("Next")
-        next_button.released.connect(self._next_grid)
-        button_layout[0].addWidget(next_button)
-
-        mark_button = QPushButton("Back")
-        mark_button.released.connect(self._back_grid)
-        button_layout[0].addWidget(mark_button)
-
-        auto_mark_button = QPushButton("Mark")
-        auto_mark_button.released.connect(self._mark_grid)
-        button_layout[0].addWidget(auto_mark_button)
+        button_layout = QHBoxLayout()
 
         self._undo_button = QPushButton("Undo")
         self._undo_button.setEnabled(False)
         self._undo_button.released.connect(self._undo_grid)
-        button_layout[1].addWidget(self._undo_button)
+        button_layout.addWidget(self._undo_button)
 
-        remove_button = QPushButton("Remove")
-        remove_button.released.connect(self._remove_grid)
-        button_layout[1].addWidget(remove_button)
+        done_button = QPushButton("Done")
+        done_button.released.connect(self._close_grid)
+        button_layout.addWidget(done_button)
 
-        hide_button = QPushButton("Hide")
-        hide_button.released.connect(self._toggle_add_grid)
-        button_layout[1].addWidget(hide_button)
-
-        move_grid_layout.addLayout(button_layout[0])
-        move_grid_layout.addLayout(button_layout[1])
+        move_grid_layout.addLayout(button_layout)
 
         self._move_grid_widget.setLayout(move_grid_layout)
         grid_layout.addWidget(self._move_grid_widget)
@@ -555,7 +538,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ax.axis("off")
             margin = np.mean(im_data.shape) * 0.2
             self._surgical_image = ax.imshow(
-                im_data,
+                im_data[::-1, ::-1],
                 aspect="auto",
                 extent=[
                     -margin,
@@ -581,9 +564,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _update_surgical_image_alpha(self):
         """Update the opacity of the surgical image."""
         alpha = self._surgical_image_alpha_slider.value() / 100
-        self._surgical_image.set_alpha(alpha)
-        self._surgical_image_chart._canvas.draw()
-        self._renderer._update()
+        if self._surgical_image is not None:
+            self._surgical_image.set_alpha(alpha)
+            self._surgical_image_chart._canvas.draw()
+            self._renderer._update()
 
     def _move_surgical_image(self, step, trans_type, direction):
         """Move the surgical image."""
@@ -672,6 +656,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             return  # not shown yet
         rr, tris = read_surface(op.join(self._subject_dir, "bem", "inner_skull.surf"))
         rr, tris = decimate_surface(rr, tris, tris.shape[0] // 20)
+        rr = apply_trans(self._mri_scan_ras_t, rr)
         rr = _cart_to_sph(rr)
         rr[:, 0] *= self._skull_spin_box.value()
         rr = _sph_to_cart(rr)
@@ -750,14 +735,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Instantiate a grid from the current position with the given specs."""
         nx = self._x_spin_box.value()
         ny = self._y_spin_box.value()
-        if nx * ny > len(self._ch_names):
+        if nx * ny > len(self._ch_names[self._ch_index:]):
             QMessageBox.information(
                 self,
                 "Not enough channels",
-                f"Grid size {nx * ny} greater than {len(self._ch_names)} "
-                "number of channels",
+                f"Grid size {nx * ny} greater than {len(self._ch_names[self._ch_index:])}: "
+                f"number of channels after current channel {self._ch_names[self._ch_index]}",
             )
             return
+        self._grid_ch_indices = list(range(self._ch_index, self._ch_index + nx * ny))
+        self._grid_ch_index = self._ch_index
         pitch = self._pitch_spin_box.value()
         grid_pos = np.array(
             [
@@ -771,6 +758,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._grid_pos = [grid_pos]
         self._grid_tris = Delaunay(grid_pos[:, 1:]).simplices
         self._show_grid()
+        self._save_grid()
+        for i in self._grid_ch_indices:
+            self._color_list_item(name=self._ch_names[i])
 
     def _import_grid(self):
         """Import grid positions from a tsv file."""
@@ -800,8 +790,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 (x, y, z),
                 scale=self._grid_radius_spin_box.value(),
                 color="yellow"
-                if i == self._grid_ch_index
-                else ("blue" if selected else "red"),
+                if i == self._grid_ch_indices.index(self._grid_ch_index)
+                else "blue",
                 opacity=1,
             )
             self._grid_actors.append(actor)
@@ -844,14 +834,22 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     mesh.translate(-trans, inplace=True)  # put back
                     pos2[i] = pos[i]
         self._grid_pos.append(pos2)
+        self._save_grid()
         self._grid_mesh.SetPoints(vtk_points(pos2))
         self._undo_button.setEnabled(True)
         self._renderer._update()
 
-    def _remove_grid(self):
-        """Remove the existing grid."""
-        for actor in self._grid_actors:
-            self._renderer.plotter.remove_actor(actor)
+    def _save_grid(self):
+        """Mark a large grid in its entirety."""
+        for pos, ch in zip(
+            self._grid_pos[-1],
+            [self._ch_names[i] for i in self._grid_ch_indices],
+        ):
+            self._chs[ch] = pos
+        self._save_ch_coords()
+
+    def _close_grid(self):
+        """Close the current grid selection window."""
         self._grid_pos = None
         self._grid_actors = None
         self._grid_meshes = None
@@ -1543,6 +1541,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._ch_list.setCurrentIndex(self._ch_list_model.index(self._ch_index, 0))
         self._group_selector.setCurrentIndex(self._groups[name])
         self._update_group()
+        self._update_grid_selection()
         if not np.isnan(self._chs[name]).any():
             self._set_ras(self._chs[name])
             self._zoom(sign=0, draw=True)
@@ -1559,30 +1558,34 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._ch_index = (self._ch_index + 1) % len(self._ch_names)
         self._update_ch_selection()
 
-    def _update_grid_selection(self, step=1, selected=False):
+    def _update_grid_selection(self):
         """Update which grid channel is selected."""
         # remove selected yellow sphere, replace with gray
-        self._renderer.plotter.remove_actor(self._grid_actors[self._grid_ch_index])
+        idx = self._grid_ch_indices.index(self._grid_ch_index)
+        self._renderer.plotter.remove_actor(self._grid_actors[idx])
         actor, mesh = self._renderer.sphere(
-            tuple(self._grid_pos[-1][self._grid_ch_index]),
+            tuple(self._grid_pos[-1][idx]),
             scale=self._grid_radius_spin_box.value(),
-            color="blue" if selected else "red",
+            color="blue",
             opacity=1,
         )
-        self._grid_actors[self._grid_ch_index] = actor
-        self._grid_meshes[self._grid_ch_index] = mesh
-
-        self._grid_ch_index = (self._grid_ch_index + step) % self._grid_pos[-1].shape[0]
+        self._grid_actors[idx] = actor
+        self._grid_meshes[idx] = mesh
 
         # remove gray sphere, replace with yellow
-        actor, mesh = self._renderer.sphere(
-            tuple(self._grid_pos[-1][self._grid_ch_index]),
-            scale=self._grid_radius_spin_box.value(),
-            color="yellow",
-            opacity=1,
-        )
-        self._grid_actors[self._grid_ch_index] = actor
-        self._grid_meshes[self._grid_ch_index] = mesh
+        if self._ch_index in self._grid_ch_indices:
+            idx = self._grid_ch_indices.index(self._ch_index)
+            actor, mesh = self._renderer.sphere(
+                tuple(self._grid_pos[-1][idx]),
+                scale=self._grid_radius_spin_box.value(),
+                color="yellow",
+                opacity=1,
+            )
+            self._grid_actors[idx] = actor
+            self._grid_meshes[idx] = mesh
+            self._grid_ch_index = self._ch_index
+        else:
+            self._grid_ch_index = None
         self._renderer._update()
 
     def _undo_grid(self):
@@ -1594,14 +1597,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._renderer._update()
         if len(self._grid_pos) < 2:
             self._undo_button.setEnabled(False)
-
-    def _next_grid(self):
-        """Increment the grid selection."""
-        self._update_grid_selection(step=1)
-
-    def _back_grid(self):
-        """Decrement the grid selection."""
-        self._update_grid_selection(step=-1)
 
     def _color_list_item(self, name=None):
         """Color the item in the view list for easy id of marked channels."""
@@ -1636,29 +1631,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         else:  # text == 'On', turn off
             self._snap_button.setText("Off")
             self._snap_button.setStyleSheet("background-color: red")
-
-    def _mark_grid(self):
-        """Mark a large grid in its entirety."""
-        if len(self._ch_names) - self._ch_index < self._grid_pos[-1].shape[0]:
-            QMessageBox.information(
-                self,
-                "Not enough channels",
-                f"Grid size {self._grid_pos[-1].shape[0]} greater than "
-                f"{len(self._ch_names) - self._ch_index} "
-                "number of channels below selection",
-            )
-            return
-        for pos, ch in zip(
-            self._grid_pos[-1],
-            self._ch_names[self._ch_index : self._ch_index + self._grid_pos[-1].size],
-        ):
-            self._chs[ch] = pos
-            self._color_list_item()
-        for actor in self._grid_actors:
-            self._renderer.plotter.remove_actor(actor, render=False)
-        self._show_grid(selected=True)
-        self._save_ch_coords()
-        self._ch_list.setFocus()
 
     @Slot()
     def mark_channel(self, ch=None):

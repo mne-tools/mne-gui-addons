@@ -42,18 +42,17 @@ def test_segment_display(renderer_interactive_pyvistaqt):
         )
 
     # test functions
-    gui.set_RAS([25.37, 0.00, 34.18])
+    gui.set_RAS([-12.91, -2.14, -34.98])
 
     # test mark
+    gui.set_tolerance(0.05)
     gui._mark()
-    assert abs(np.nansum(gui._vol_img) - 250) < 3
+    assert abs(np.nansum(gui._vol_img) - 19) < 3
 
-    # increase tolerance
-    gui.set_tolerance(0.5)
-
-    # check more voxels marked
+    # set increased tolerance
+    gui.set_tolerance(0.1)
     gui._mark()
-    assert np.nansum(gui._vol_img) > 253
+    assert np.nansum(gui._vol_img) > 19  # check more voxels marked
 
     # check smooth
     gui.set_smooth(0.7)
