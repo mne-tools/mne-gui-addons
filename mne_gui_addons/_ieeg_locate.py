@@ -735,7 +735,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Instantiate a grid from the current position with the given specs."""
         nx = self._x_spin_box.value()
         ny = self._y_spin_box.value()
-        if nx * ny > len(self._ch_names[self._ch_index:]):
+        if nx * ny > len(self._ch_names[self._ch_index :]):
             QMessageBox.information(
                 self,
                 "Not enough channels",

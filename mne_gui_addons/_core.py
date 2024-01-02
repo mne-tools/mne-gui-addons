@@ -368,7 +368,7 @@ class SliceBrowser(QMainWindow):
                     img_data,
                     cmap="gray",
                     aspect="auto",
-                    interpolation='spline16',
+                    interpolation="spline16",
                     zorder=1,
                     vmin=img_min,
                     vmax=img_max,

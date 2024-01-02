@@ -76,7 +76,7 @@ def _voxel_neighbors(seed, image, tol, max_n_voxels=200, max_queue=20):
         add_neighbors = _get_neighbors(closest_neighbor, image, val, tol)
         # add neighbors of marked voxel to look up table of differences
         for neighbor in add_neighbors:
-            if neighbor not in voxels:   # prevent looping back
+            if neighbor not in voxels:  # prevent looping back
                 neighbors_lut[neighbor] = add_neighbors[neighbor]
                 for i, neighbor2 in enumerate(neighbors_queue[:max_queue]):
                     # add to neighbor queue
