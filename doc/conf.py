@@ -36,8 +36,8 @@ intersphinx_mapping = {
     "matplotlib": ("https://matplotlib.org/stable", None),
     "nibabel": ("https://nipy.org/nibabel", None),
     "dipy": (
-        "https://docs.dipy.org/latest/objects.inv/",
-        "https://docs.dipy.org/stable/objects.inv/",
+        "https://docs.dipy.org/latest/objects.inv",
+        "https://docs.dipy.org/stable/objects.inv",
     ),
     "mne": ("https://mne.tools/stable", None),
     "mne_bids": ("https://mne.tools/mne-bids/stable", None),
