@@ -315,7 +315,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         buttons = dict()
         for trans_type in ("trans", "rotation"):
-            for direction in ("x", "y", "z"):
+            for direction in ("left/right", "up/down", "in-plane"):
                 direction_layout = QHBoxLayout()
                 buttons[("left", trans_type, direction)] = QPushButton("<")
                 buttons[("left", trans_type, direction)].setFixedSize(50, 20)
@@ -810,16 +810,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Translate or rotate the grid."""
         pos = self._grid_pos[-1]
         center = pos.mean(axis=0)
-        xyz = (
-            np.array(
-                [
-                    step * (direction == this_direction)
-                    for this_direction in ("x", "y", "z")
-                ]
-            )
-            * self._step_size_slider.value()
-            / 100
-        )
+        if direction == "in-plane":
+            xyz = center
+        elif direction == "up/down":
+            xyz = pos[1] - pos[0]
+        else:
+            xyz = np.cross(center / np.linalg.norm(center),
+                           (pos[1] - pos[0]) / np.linalg.norm(pos[1] - pos[0]))
+        xyz /= np.linalg.norm(xyz)
+        xyz *= step * self._step_size_slider.value() / 100
+
         collide_skull = self._skull_mesh is not None and self._skull_actor.visibility
         if trans_type == "trans":
             pos2 = pos + translation(*xyz)[:3, 3]
