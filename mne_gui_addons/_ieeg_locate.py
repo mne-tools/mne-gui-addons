@@ -264,17 +264,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
         grid_spec_layouts[1].addWidget(make_label("y dimension"))
         grid_spec_layouts[1].addWidget(self._y_spin_box)
 
-        self._radius_spin_box = QDoubleSpinBox()
-        self._radius_spin_box.setRange(0, 10)
-        self._radius_spin_box.setValue(0.3)
-        grid_spec_layouts[2].addWidget(make_label("radius mm"))
-        grid_spec_layouts[2].addWidget(self._radius_spin_box)
-
         self._pitch_spin_box = QDoubleSpinBox()
         self._pitch_spin_box.setRange(0, 1000)
         self._pitch_spin_box.setValue(1)
-        grid_spec_layouts[3].addWidget(make_label("pitch (spacing) mm"))
-        grid_spec_layouts[3].addWidget(self._pitch_spin_box)
+        grid_spec_layouts[2].addWidget(make_label("pitch (spacing) mm"))
+        grid_spec_layouts[2].addWidget(self._pitch_spin_box)
 
         for grid_spec_layout in grid_spec_layouts:
             add_grid_layout.addLayout(grid_spec_layout)
