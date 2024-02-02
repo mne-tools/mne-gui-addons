@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
     QMessageBox,
     QWidget,
     QLineEdit,
+    QSlider,
 )
 
 from matplotlib import patheffects
@@ -180,6 +181,10 @@ class SliceBrowser(QMainWindow):
         self._subject_dir = (
             op.join(subjects_dir, subject) if subject and subjects_dir else None
         )
+        if self._subject_dir is None and base_image is None:
+            raise ValueError(
+                "`subjects_dir` must be provided if no `base_image` is provided"
+            )
         self._load_image_data(base_image=base_image)
 
         # GUI design
@@ -363,6 +368,7 @@ class SliceBrowser(QMainWindow):
                     img_data,
                     cmap="gray",
                     aspect="auto",
+                    interpolation="spline16",
                     zorder=1,
                     vmin=img_min,
                     vmax=img_max,
@@ -416,7 +422,10 @@ class SliceBrowser(QMainWindow):
                 [1],
             )[0]
             rr = apply_trans(self._ras_vox_scan_ras_t, rr)  # base image vox -> RAS
-            self._renderer.mesh(
+
+            self._head = dict(rr=rr, tris=tris)
+
+            self._head_actor, _ = self._renderer.mesh(
                 *rr.T,
                 triangles=tris,
                 color="gray",
@@ -425,7 +434,7 @@ class SliceBrowser(QMainWindow):
                 render=False,
             )
         else:
-            self._renderer.mesh(
+            self._head_actor, _ = self._renderer.mesh(
                 *self._head["rr"].T,
                 triangles=self._head["tris"],
                 color="gray",
@@ -437,7 +446,7 @@ class SliceBrowser(QMainWindow):
             self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T,
                 triangles=self._lh["tris"],
-                color="white",
+                color="gray",
                 opacity=0.2,
                 reset_camera=False,
                 render=False,
@@ -445,7 +454,7 @@ class SliceBrowser(QMainWindow):
             self._rh_actor, _ = self._renderer.mesh(
                 *self._rh["rr"].T,
                 triangles=self._rh["tris"],
-                color="white",
+                color="gray",
                 opacity=0.2,
                 reset_camera=False,
                 render=False,
@@ -699,6 +708,17 @@ class SliceBrowser(QMainWindow):
                 )
             self._set_ras(ras)
 
+    def _make_slider(self, smin, smax, sval, sfun=None):
+        slider = QSlider(QtCore.Qt.Horizontal)
+        slider.setMinimum(int(round(smin)))
+        slider.setMaximum(int(round(smax)))
+        slider.setValue(int(round(sval)))
+        slider.setTracking(False)  # only update on release
+        if sfun is not None:
+            slider.valueChanged.connect(sfun)
+        slider.keyPressEvent = self.keyPressEvent
+        return slider
+
     def _on_click(self, event, axis):
         """Move to view on MRI and CT on click."""
         if event.inaxes is self._figs[axis].axes[0]:
@@ -721,6 +741,7 @@ class SliceBrowser(QMainWindow):
         self._intensity_label.setText(
             "intensity = {:.2f}".format(self._base_data[tuple(self._current_slice)])
         )
+        self._update_camera(render=True)
 
     @safe_event
     def closeEvent(self, event):

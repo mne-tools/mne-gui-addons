@@ -22,6 +22,7 @@ dependencies = [
     "nibabel",
     "dipy>=1.4",
     "traitlets",
+    "pandas",
     "setuptools >=65",
 ]
 dynamic = ["version"]
