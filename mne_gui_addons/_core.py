@@ -483,7 +483,7 @@ class SliceBrowser(QMainWindow):
         self._show_hide_selector.addItem("Show/Hide")
         model = self._show_hide_selector.model()
         model.itemFromIndex(model.index(0, 0)).setSelectable(False)
-        
+
         if self._head_actor is not None:
             self._show_hide_selector.addItem("Hide head")
 
@@ -577,9 +577,11 @@ class SliceBrowser(QMainWindow):
             return
         idx = self._show_hide_selector.currentIndex()
         show_hide, item = text.split(" ")
-        actors = dict(head=[self._head_actor],
-                      brain=[self._lh_actor, self._rh_actor],
-                      rendering=[self._mc_actor])[item]
+        actors = dict(
+            head=[self._head_actor],
+            brain=[self._lh_actor, self._rh_actor],
+            rendering=[self._mc_actor],
+        )[item]
         show_hide_opp = "Show" if show_hide == "Hide" else "Hide"
         self._show_hide_selector.setItemText(idx, f"{show_hide_opp} {item}")
         for actor in actors:
