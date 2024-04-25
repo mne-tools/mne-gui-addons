@@ -992,7 +992,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _update_ct_images(self, axis=None, draw=False):
         """Update the CT image(s)."""
         for axis in range(3) if axis is None else [axis]:
-            ct_data = np.take(self._ct_data, self._current_slice[axis], axis=axis).T
+            ct_data = self._ct_data[
+                (slice(None),) * axis + (self._current_slice[axis],)
+            ].T
             # Threshold the CT so only bright objects (electrodes) are visible
             ct_data[ct_data < self._ct_min_slider.value()] = np.nan
             ct_data[ct_data > self._ct_max_slider.value()] = np.nan
@@ -1010,7 +1012,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         if "mri" in self._images:
             for axis in range(3) if axis is None else [axis]:
                 self._images["mri"][axis].set_data(
-                    np.take(self._mr_data, self._current_slice[axis], axis=axis).T
+                    self._mr_data[
+                        (slice(None),) * axis + (self._current_slice[axis],)
+                    ].T
                 )
                 if draw:
                     self._draw(axis)
