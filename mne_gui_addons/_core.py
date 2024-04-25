@@ -11,7 +11,7 @@ import numpy as np
 from functools import partial
 
 from qtpy import QtCore
-from qtpy.QtCore import Slot, Qt
+from qtpy.QtCore import Slot, Signal, Qt
 from qtpy.QtWidgets import (
     QMainWindow,
     QGridLayout,
@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
     QMessageBox,
     QWidget,
     QLineEdit,
+    QComboBox,
 )
 
 from matplotlib import patheffects
@@ -149,6 +150,17 @@ def make_label(name):
     label = QLabel(name)
     label.setAlignment(QtCore.Qt.AlignCenter)
     return label
+
+
+class ComboBox(QComboBox):
+    """Dropdown menu that emits a click when popped up."""
+
+    clicked = Signal()
+
+    def showPopup(self):
+        """Override show popup method to emit click."""
+        self.clicked.emit()
+        super(ComboBox, self).showPopup()
 
 
 class SliceBrowser(QMainWindow):
@@ -416,7 +428,7 @@ class SliceBrowser(QMainWindow):
                 [1],
             )[0]
             rr = apply_trans(self._ras_vox_scan_ras_t, rr)  # base image vox -> RAS
-            self._renderer.mesh(
+            self._mc_actor, _ = self._renderer.mesh(
                 *rr.T,
                 triangles=tris,
                 color="gray",
@@ -424,8 +436,9 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
+            self._head_actor = None
         else:
-            self._renderer.mesh(
+            self._head_actor, _ = self._renderer.mesh(
                 *self._head["rr"].T,
                 triangles=self._head["tris"],
                 color="gray",
@@ -433,6 +446,7 @@ class SliceBrowser(QMainWindow):
                 reset_camera=False,
                 render=False,
             )
+            self._mc_actor = None
         if self._lh is not None and self._rh is not None and self._base_mr_aligned:
             self._lh_actor, _ = self._renderer.mesh(
                 *self._lh["rr"].T,
@@ -462,6 +476,24 @@ class SliceBrowser(QMainWindow):
     def _configure_status_bar(self, hbox=None):
         """Make a bar at the bottom with information in it."""
         hbox = QHBoxLayout() if hbox is None else hbox
+
+        self._show_hide_selector = ComboBox()
+
+        # add title, not selectable
+        self._show_hide_selector.addItem("Show/Hide")
+        model = self._show_hide_selector.model()
+        model.itemFromIndex(model.index(0, 0)).setSelectable(False)
+        
+        if self._head_actor is not None:
+            self._show_hide_selector.addItem("Hide head")
+
+        if self._lh_actor is not None and self._rh_actor is not None:
+            self._show_hide_selector.addItem("Hide brain")
+
+        if self._mc_actor is not None:
+            self._show_hide_selector.addItem("Hide rendering")
+        self._show_hide_selector.currentIndexChanged.connect(self._show_hide)
+        hbox.addWidget(self._show_hide_selector)
 
         self._intensity_label = QLabel("")  # update later
         hbox.addWidget(self._intensity_label)
@@ -537,6 +569,23 @@ class SliceBrowser(QMainWindow):
         ras = self._convert_text(self._VOX_textbox.text(), "vox")
         if ras is not None:
             self._set_ras(ras)
+
+    def _show_hide(self):
+        """Show or hide objects in the 3D rendering."""
+        text = self._show_hide_selector.currentText()
+        if text == "Show/Hide":
+            return
+        idx = self._show_hide_selector.currentIndex()
+        show_hide, item = text.split(" ")
+        actors = dict(head=[self._head_actor],
+                      brain=[self._lh_actor, self._rh_actor],
+                      rendering=[self._mc_actor])[item]
+        show_hide_opp = "Show" if show_hide == "Hide" else "Hide"
+        self._show_hide_selector.setItemText(idx, f"{show_hide_opp} {item}")
+        for actor in actors:
+            actor.SetVisibility(show_hide == "Show")
+        self._show_hide_selector.setCurrentIndex(0)  # back to title
+        self._renderer._update()
 
     def _convert_text(self, text, text_kind):
         text = text.replace("\n", "")

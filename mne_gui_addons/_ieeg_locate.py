@@ -11,7 +11,7 @@ import platform
 from scipy.ndimage import maximum_filter
 
 from qtpy import QtCore, QtGui
-from qtpy.QtCore import Slot, Signal
+from qtpy.QtCore import Slot
 from qtpy.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -22,10 +22,9 @@ from qtpy.QtWidgets import (
     QListView,
     QSlider,
     QPushButton,
-    QComboBox,
 )
 
-from ._core import SliceBrowser, _CMAP, _N_COLORS
+from ._core import SliceBrowser, ComboBox, _CMAP, _N_COLORS
 from mne.channels import make_dig_montage
 from mne.surface import _voxel_neighbors
 from mne.transforms import apply_trans, _get_trans, invert_transform
@@ -41,17 +40,6 @@ _CH_MENU_WIDTH = 30 if platform.system() == "Windows" else 15
 _VOXEL_NEIGHBORS_THRESH = 0.75
 _SEARCH_ANGLE_THRESH = np.deg2rad(30)
 _MISSING_PROP_OKAY = 0.25
-
-
-class ComboBox(QComboBox):
-    """Dropdown menu that emits a click when popped up."""
-
-    clicked = Signal()
-
-    def showPopup(self):
-        """Override show popup method to emit click."""
-        self.clicked.emit()
-        super(ComboBox, self).showPopup()
 
 
 class IntracranialElectrodeLocator(SliceBrowser):
