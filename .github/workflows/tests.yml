@@ -65,9 +65,9 @@ jobs:
     - run: pip install -v ${{ matrix.qt }}!=6.6.1 "PyQt6-Qt6!=6.6.1"
     - run: pip install -ve .[tests]
     - run: mne sys_info
-    - run: |
-        set -eo pipefail
-        mne sys_info -pd | grep "qtpy:\? .*${{ matrix.qt }}=.*$"
+    # Check Qt
+    - run: ./tools/check_qt_import.sh $MNE_QT_BACKEND
+      if: ${{ env.MNE_QT_BACKEND != '' }}
       name: Check Qt
       shell: bash
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
