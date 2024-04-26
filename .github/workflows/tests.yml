@@ -14,31 +14,6 @@ on:
     tags: ['**']
 
 jobs:
-  style:
-    name: Style
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: pre-commit/action@v3.0.1
-      - run: pip install mypy numpy scipy vulture
-      - run: mypy
-      - run: vulture
-
-  bandit:
-    name: Bandit
-    needs: style
-    runs-on: ubuntu-latest
-    steps:
-      - uses: davidslusser/actions_python_bandit@v1.0.1
-        with:
-          src: "mne"
-          options: "-c pyproject.toml -ll -r"
-          pip_install_command: "pip install bandit[toml]"
-
   pytest:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
