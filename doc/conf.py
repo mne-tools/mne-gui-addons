@@ -35,10 +35,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
     "nibabel": ("https://nipy.org/nibabel", None),
-    "dipy": (
-        "https://dipy.org/documentation/latest/",
-        "https://dipy.org/documentation/latest/objects.inv/",
-    ),
+    "dipy": ("https://docs.dipy.org/stable", None),
     "mne": ("https://mne.tools/stable", None),
     "mne_bids": ("https://mne.tools/mne-bids/stable", None),
 }
@@ -53,8 +50,6 @@ numpydoc_xref_aliases = {
     "AverageTFR": "mne.time_frequency.AverageTFR",
     "EpochsTFR": "mne.time_frequency.EpochsTFR",
     "Transform": "mne.transforms.Transform",
-    # MNE-GUI-Addons
-    "IntracranialElectrodeLocator": "mne_gui_addons.IntracranialElectrodeLocator",
 }
 numpydoc_xref_ignore = {
     # words
