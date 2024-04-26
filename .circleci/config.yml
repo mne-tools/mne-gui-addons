@@ -60,6 +60,12 @@ jobs:
             command: python -m pip list
         - restore_cache:
             keys:
+              - data-cache-sample
+        - restore_cache:
+            keys:
+              - data-cache-misc
+        - restore_cache:
+            keys:
               - data-cache-somato
         - run:
             name: Get data
