@@ -54,7 +54,8 @@ numpydoc_xref_aliases = {
     "EpochsTFR": "mne.time_frequency.EpochsTFR",
     "Transform": "mne.transforms.Transform",
     # MNE-GUI-Addons
-    # 'IntracranialElectrodeLocator': 'mne_gui_addons.IntracranialElectrodeLocator',  # Many doc errors!
+    'IntracranialElectrodeLocator':
+        'mne_gui_addons.IntracranialElectrodeLocator',
 }
 numpydoc_xref_ignore = {
     # words

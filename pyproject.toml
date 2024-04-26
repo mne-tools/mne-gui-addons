@@ -32,6 +32,7 @@ dynamic = ["version"]
 tests = [
     "pytest",
     "pytest-cov",
+    "black",  # function signature formatting
     "sphinx-gallery",
     "imageio-ffmpeg>=0.4.1",
 ]
