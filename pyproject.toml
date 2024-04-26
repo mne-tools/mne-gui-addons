@@ -16,6 +16,8 @@ classifiers = [
 dependencies = [
     "packaging",
     "qtpy",
+    "PyQt6!=6.6.0",
+    "PyQt6-Qt6!=6.6.0,!=6.7.0",
     "pyvista",
     "pyvistaqt",
     "mne",
@@ -30,7 +32,6 @@ dynamic = ["version"]
 tests = [
     "pytest",
     "pytest-cov",
-    "black",  # function signature formatting
     "sphinx-gallery",
     "imageio-ffmpeg>=0.4.1",
 ]

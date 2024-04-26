@@ -14,6 +14,31 @@ on:
     tags: ['**']
 
 jobs:
+  style:
+    name: Style
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pre-commit/action@v3.0.1
+      - run: pip install mypy numpy scipy vulture
+      - run: mypy
+      - run: vulture
+
+  bandit:
+    name: Bandit
+    needs: style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: davidslusser/actions_python_bandit@v1.0.1
+        with:
+          src: "mne"
+          options: "-c pyproject.toml -ll -r"
+          pip_install_command: "pip install bandit[toml]"
+
   pytest:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
@@ -62,7 +87,7 @@ jobs:
       if: "matrix.mne-version == 'mne-main'"
       run: git clone --single-branch --branch main https://github.com/mne-tools/mne-python.git
     - run: pip install -ve ./mne-python
-    - run: pip install -v ${{ matrix.qt }}!=6.6.1 "PyQt6-Qt6!=6.6.1"
+    - run: pip install -v ${{ matrix.qt }}!=6.6.1 "PyQt6-Qt6!=6.6.1" "PyQt6!=6.6.0" "PyQt6-Qt6!=6.6.0,!=6.7.0"
     - run: pip install -ve .[tests]
     - run: mne sys_info
     # Check Qt
