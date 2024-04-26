@@ -84,6 +84,10 @@ jobs:
             paths:
               - html
         - save_cache:
+            key: data-cache-sample
+            paths:
+              - ~/mne_data/MNE-sample-data
+        - save_cache:
             key: data-cache-somato
             paths:
               - ~/mne_data/MNE-somato-data
