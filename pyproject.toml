@@ -16,6 +16,8 @@ classifiers = [
 dependencies = [
     "packaging",
     "qtpy",
+    "PyQt6!=6.6.0",
+    "PyQt6-Qt6!=6.6.0,!=6.7.0",
     "pyvista",
     "pyvistaqt",
     "mne",

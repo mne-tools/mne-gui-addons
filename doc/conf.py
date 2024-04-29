@@ -1,6 +1,7 @@
 import faulthandler
 import os
 import sys
+from pathlib import Path
 
 import pyvista
 import mne_gui_addons
@@ -10,6 +11,14 @@ os.environ["_MNE_BROWSER_NO_BLOCK"] = "true"
 os.environ["MNE_BROWSER_OVERVIEW_MODE"] = "hidden"
 os.environ["MNE_BROWSER_THEME"] = "light"
 os.environ["MNE_3D_OPTION_THEME"] = "light"
+
+# -- Path setup --------------------------------------------------------------
+
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+curpath = Path(__file__).parent.resolve(strict=True)
+sys.path.append(str(curpath / "sphinxext"))
 
 project = "MNE-GUI-Addons"
 release = mne_gui_addons.__version__
@@ -35,10 +44,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
     "nibabel": ("https://nipy.org/nibabel", None),
-    "dipy": (
-        "https://dipy.org/documentation/latest/",
-        "https://dipy.org/documentation/latest/objects.inv/",
-    ),
+    "dipy": ("https://docs.dipy.org/stable", None),
     "mne": ("https://mne.tools/stable", None),
     "mne_bids": ("https://mne.tools/mne-bids/stable", None),
 }
@@ -53,8 +59,6 @@ numpydoc_xref_aliases = {
     "AverageTFR": "mne.time_frequency.AverageTFR",
     "EpochsTFR": "mne.time_frequency.EpochsTFR",
     "Transform": "mne.transforms.Transform",
-    # MNE-GUI-Addons
-    # 'IntracranialElectrodeLocator': 'mne_gui_addons.IntracranialElectrodeLocator',  # Many doc errors!
 }
 numpydoc_xref_ignore = {
     # words
@@ -108,7 +112,7 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "min_reported_time": 1.0,
     "abort_on_example_error": False,
-    "image_scrapers": ("matplotlib", mne_gui_addons._GUIScraper(), "pyvista"),
+    "image_scrapers": ("matplotlib", "mne_gui_addons_doc_utils.gui_scraper", "pyvista"),
     "show_memory": not sys.platform.startswith(("win", "darwin")),
     "line_numbers": False,  # messes with style
     "capture_repr": ("_repr_html_",),

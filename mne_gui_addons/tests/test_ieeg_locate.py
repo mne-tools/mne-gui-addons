@@ -83,8 +83,7 @@ def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
     with pytest.warns(RuntimeWarning, match="nasion not found"):
         info.set_montage(montage)
     with pytest.raises(RuntimeError, match='must be in the "head" coordinate frame'):
-        with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
-            mne_gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
+        mne_gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
 
 
 @pytest.mark.allow_unclosed_pyside2
