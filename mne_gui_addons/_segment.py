@@ -112,7 +112,7 @@ class VolumeSegmenter(SliceBrowser):
             self.show()
 
     def _configure_ui(self):
-        # toolbar = self._configure_toolbar()
+        toolbar = self._configure_toolbar()
         slider_bar = self._configure_sliders()
         status_bar = self._configure_status_bar()
 
@@ -120,7 +120,7 @@ class VolumeSegmenter(SliceBrowser):
         plot_layout.addLayout(self._plt_grid)
 
         main_vbox = QVBoxLayout()
-        # main_vbox.addLayout(toolbar)
+        main_vbox.addLayout(toolbar)
         main_vbox.addLayout(slider_bar)
         main_vbox.addLayout(plot_layout)
         main_vbox.addLayout(status_bar)

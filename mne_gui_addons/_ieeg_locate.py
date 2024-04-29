@@ -301,11 +301,10 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Make a bar with buttons for user interactions."""
         hbox = QHBoxLayout()
 
-        help_button = QPushButton("Help")
-        help_button.released.connect(self._show_help)
-        hbox.addWidget(help_button)
-
-        hbox.addStretch(8)
+        # add help and show/hide
+        super(IntracranialElectrodeLocator, self)._configure_toolbar(hbox=hbox)
+        
+        hbox.addStretch(1)
 
         hbox.addWidget(QLabel("Snap to Center"))
         self._snap_button = QPushButton("Off")
@@ -313,6 +312,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         hbox.addWidget(self._snap_button)
         self._snap_button.released.connect(self._toggle_snap)
         self._toggle_snap()  # turn on to start
+
+        hbox.addStretch(1)
+
+        self._auto_complete_button = QPushButton("Auto Complete")
+        self._auto_complete_button.released.connect(self._auto_mark_group)
+        hbox.addWidget(self._auto_complete_button)
 
         hbox.addStretch(1)
 
@@ -401,11 +406,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _configure_status_bar(self, hbox=None):
         hbox = QHBoxLayout() if hbox is None else hbox
 
-        self._auto_complete_button = QPushButton("Auto Complete")
-        self._auto_complete_button.released.connect(self._auto_mark_group)
-        hbox.addWidget(self._auto_complete_button)
-
-        hbox.addStretch(3)
+        hbox.addStretch(1)
 
         self._intensity_label = QLabel("")  # update later
         hbox.addWidget(self._intensity_label)

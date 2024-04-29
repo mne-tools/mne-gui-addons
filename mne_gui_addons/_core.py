@@ -22,6 +22,7 @@ from qtpy.QtWidgets import (
     QWidget,
     QLineEdit,
     QComboBox,
+    QPushButton,
 )
 
 from matplotlib import patheffects
@@ -220,6 +221,7 @@ class SliceBrowser(QMainWindow):
         self._configure_ui()
 
     def _configure_ui(self):
+        toolbar = self._configure_toolbar()
         bottom_hbox = self._configure_status_bar()
 
         # Put everything together
@@ -227,6 +229,7 @@ class SliceBrowser(QMainWindow):
         plot_ch_hbox.addLayout(self._plt_grid)
 
         main_vbox = QVBoxLayout()
+        main_vbox.addLayout(toolbar)
         main_vbox.addLayout(plot_ch_hbox)
         main_vbox.addLayout(bottom_hbox)
 
@@ -480,9 +483,15 @@ class SliceBrowser(QMainWindow):
         self._draw()
         self._renderer._update()
 
-    def _configure_status_bar(self, hbox=None):
-        """Make a bar at the bottom with information in it."""
+    def _configure_toolbar(self, hbox=None):
+        """Make a bar at the top with tools on it."""
         hbox = QHBoxLayout() if hbox is None else hbox
+
+        help_button = QPushButton("Help")
+        help_button.released.connect(self._show_help)
+        hbox.addWidget(help_button)
+
+        hbox.addStretch(6)
 
         self._toggle_show_selector = ComboBox()
 
@@ -517,6 +526,11 @@ class SliceBrowser(QMainWindow):
 
         self._toggle_show_selector.currentIndexChanged.connect(self._toggle_show)
         hbox.addWidget(self._toggle_show_selector)
+        return hbox
+
+    def _configure_status_bar(self, hbox=None):
+        """Make a bar at the bottom with information in it."""
+        hbox = QHBoxLayout() if hbox is None else hbox
 
         self._intensity_label = QLabel("")  # update later
         hbox.addWidget(self._intensity_label)
