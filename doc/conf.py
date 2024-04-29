@@ -1,6 +1,7 @@
 import faulthandler
 import os
 import sys
+from pathlib import Path
 
 import pyvista
 import mne_gui_addons
@@ -10,6 +11,14 @@ os.environ["_MNE_BROWSER_NO_BLOCK"] = "true"
 os.environ["MNE_BROWSER_OVERVIEW_MODE"] = "hidden"
 os.environ["MNE_BROWSER_THEME"] = "light"
 os.environ["MNE_3D_OPTION_THEME"] = "light"
+
+# -- Path setup --------------------------------------------------------------
+
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+curpath = Path(__file__).parent.resolve(strict=True)
+sys.path.append(str(curpath / "sphinxext"))
 
 project = "MNE-GUI-Addons"
 release = mne_gui_addons.__version__
@@ -103,7 +112,7 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "min_reported_time": 1.0,
     "abort_on_example_error": False,
-    "image_scrapers": ("matplotlib", mne_gui_addons._GUIScraper(), "pyvista"),
+    "image_scrapers": ("matplotlib", "mne_gui_addons_doc_utils.gui_scraper", "pyvista"),
     "show_memory": not sys.platform.startswith(("win", "darwin")),
     "line_numbers": False,  # messes with style
     "capture_repr": ("_repr_html_",),
