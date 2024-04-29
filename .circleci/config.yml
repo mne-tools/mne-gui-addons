@@ -42,8 +42,7 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              # TO DO: sphinx-gallery main -> stable on 0.17 release
-              pip install --upgrade PyQt6!=6.6.0 "PyQt6-Qt6!=6.6.0,!=6.7.0" git+https://github.com/sphinx-gallery/sphinx-gallery.git pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject pyvista memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
+              pip install --upgrade PyQt6!=6.6.0 "PyQt6-Qt6!=6.6.0,!=6.7.0" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject pyvista memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
               pip install -ve ./mne-python .
         - run:
             name: Check Qt
