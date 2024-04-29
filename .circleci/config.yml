@@ -42,7 +42,8 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              pip install --upgrade PyQt6!=6.6.1 "PyQt6-Qt6!=6.6.1" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject git+https://github.com/pyvista/pyvista@main memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
+              # TO DO: sphinx-gallery main -> stable on 0.17 release
+              pip install --upgrade PyQt6!=6.6.0 "PyQt6-Qt6!=6.6.0,!=6.7.0" git+https://github.com/sphinx-gallery/sphinx-gallery.git pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject pyvista memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
               pip install -ve ./mne-python .
         - run:
             name: Check Qt
@@ -60,11 +61,17 @@ jobs:
             command: python -m pip list
         - restore_cache:
             keys:
+              - data-cache-sample
+        - restore_cache:
+            keys:
+              - data-cache-misc
+        - restore_cache:
+            keys:
               - data-cache-somato
         - run:
             name: Get data
             command: |
-              python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True); mne.datasets.misc.data_path(update_path=True, verbose=True);"
+              python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True); mne.datasets.misc.data_path(update_path=True, verbose=True); sample_path = mne.datasets.sample.data_path(update_path=True, verbose=True); mne.datasets.fetch_fsaverage(subjects_dir=sample_path / 'subjects', verbose=True)"
               ls -al ~/mne_data;
         - run:
             name: make html
@@ -83,6 +90,10 @@ jobs:
             root: doc/_build
             paths:
               - html
+        - save_cache:
+            key: data-cache-sample
+            paths:
+              - ~/mne_data/MNE-sample-data
         - save_cache:
             key: data-cache-somato
             paths:

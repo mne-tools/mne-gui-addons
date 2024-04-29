@@ -103,7 +103,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             )
 
         self._ch_names = info.ch_names
-        # load channels, leave in "head" coordinate frame until transforms are loaded in super
+        # load channels, leave in "head" coordinate frame
+        # until transforms are loaded in super
         self._chs = {
             name: ch["loc"][:3] for name, ch in zip(info.ch_names, info["chs"])
         }
@@ -133,7 +134,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._update_lines(group)
 
         # ready for user
-        # set current position as (0, 0, 0) surface RAS (center of mass roughly) if no positions
+        # set current position as (0, 0, 0) surface RAS
+        # (center of mass roughly) if no positions
         if np.isnan(self._chs[self._ch_names[self._ch_index]]).any():
             self._set_ras(
                 apply_trans(
@@ -572,7 +574,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                     if np.min(
                         [np.linalg.norm(next_loc - loc) for loc in locs]
                     ) > np.sqrt(3):
-                        # update the direction to account for bent electrodes and grids contoured to the brain
+                        # update the direction to account for bent electrodes
+                        # and grids contoured to the brain
                         rr_tmp = next_loc - np.array(
                             locs[-1] if direction == 1 else locs[0]
                         )
@@ -714,7 +717,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 )
                 v /= np.linalg.norm(v)
             for i, tv in enumerate(local_maxima):  # try neartest sequentially
-                # only try entry if given, otherwise try other local maxima as direction vectors
+                # only try entry if given,
+                # otherwise try other local maxima as direction vectors
                 for tv2 in local_maxima[i + 1 :] if entry is None else [tv + v]:
                     # find specified direction vector/direction vector to next contact
                     r = (tv2 - tv) / np.linalg.norm(tv2 - tv)
