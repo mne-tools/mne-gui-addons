@@ -45,6 +45,9 @@ _MISSING_PROP_OKAY = 0.25
 class IntracranialElectrodeLocator(SliceBrowser):
     """Locate electrode contacts using a coregistered MRI and CT."""
 
+    _showing_max_intensity_proj = False
+    _showing_local_maxima = False
+
     def __init__(
         self,
         info,
@@ -313,13 +316,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         hbox.addStretch(1)
 
-        if self._base_mr_aligned:
-            self._toggle_brain_button = QPushButton("Show Brain")
-            self._toggle_brain_button.released.connect(self._toggle_show_brain)
-            hbox.addWidget(self._toggle_brain_button)
-
-        hbox.addStretch(1)
-
         mark_button = QPushButton("Mark")
         hbox.addWidget(mark_button)
         mark_button.released.connect(self.mark_channel)
@@ -410,14 +406,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
         hbox.addWidget(self._auto_complete_button)
 
         hbox.addStretch(3)
-
-        self._toggle_show_mip_button = QPushButton("Show Max Intensity Proj")
-        self._toggle_show_mip_button.released.connect(self._toggle_show_mip)
-        hbox.addWidget(self._toggle_show_mip_button)
-
-        self._toggle_show_max_button = QPushButton("Show Maxima")
-        self._toggle_show_max_button.released.connect(self._toggle_show_max)
-        hbox.addWidget(self._toggle_show_max_button)
 
         self._intensity_label = QLabel("")  # update later
         hbox.addWidget(self._intensity_label)
@@ -785,7 +773,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 line.remove()
             self._lines_2D.pop(group)
         if only_2D:  # if not in projection, don't add 2D lines
-            if self._toggle_show_mip_button.text() == "Show Max Intensity Proj":
+            if not self._showing_max_intensity_proj:
                 return
         elif group in self._lines:  # if updating 3D, remove first
             self._renderer.plotter.remove_actor(self._lines[group], render=False)
@@ -815,7 +803,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 radius=self._radius * _TUBE_SCALAR,
                 color=_CMAP(group)[:3],
             )[0]
-        if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
+        if self._showing_max_intensity_proj:
             # add 2D lines on each slice plot if in max intensity projection
             target_vox = apply_trans(self._scan_ras_ras_vox_t, pos[target_idx])
             insert_vox = apply_trans(
@@ -974,7 +962,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         """Update the channel image(s)."""
         for axis in range(3) if axis is None else [axis]:
             self._images["chs"][axis].set_data(self._make_ch_image(axis))
-            if self._toggle_show_mip_button.text() == "Hide Max Intensity Proj":
+            if self._showing_max_intensity_proj:
                 self._images["mip_chs"][axis].set_data(
                     self._make_ch_image(axis, proj=True)
                 )
@@ -997,18 +985,29 @@ class IntracranialElectrodeLocator(SliceBrowser):
             if draw:
                 self._draw(axis)
 
+    def _get_mr_slice(self, axis):
+        """Get the current MR slice."""
+        mri_data = np.take(
+            self._mr_data, self._current_slice[axis], axis=axis
+        ).T
+        if self._using_atlas:
+            mri_slice = mri_data.copy().astype(int)
+            mri_data = np.zeros(mri_slice.shape + (3,), dtype=int)
+            for i in range(mri_slice.shape[0]):
+                for j in range(mri_slice.shape[1]):
+                    mri_data[i, j] = self._fs_lut[mri_slice[i, j]][:3]
+        return mri_data
+
     def _update_mri_images(self, axis=None, draw=False):
-        """Update the CT image(s)."""
+        """Update the MR image(s)."""
         if "mri" in self._images:
             for axis in range(3) if axis is None else [axis]:
-                self._images["mri"][axis].set_data(
-                    np.take(self._mr_data, self._current_slice[axis], axis=axis).T
-                )
+                self._images["mri"][axis].set_data(self._get_mr_slice(axis))
                 if draw:
                     self._draw(axis)
 
     def _update_images(self, axis=None, draw=True):
-        """Update CT and channel images when general changes happen."""
+        """Update CT, MR and channel images when general changes happen."""
         self._update_ch_images(axis=axis)
         self._update_mri_images(axis=axis)
         self._update_ct_images(axis=axis)
@@ -1027,7 +1026,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _update_radius(self):
         """Update channel plot radius."""
         self._radius = np.round(self._radius_slider.value()).astype(int)
-        if self._toggle_show_max_button.text() == "Hide Maxima":
+        if self._showing_local_maxima:
             self._update_ct_maxima()
             self._update_ct_images()
         else:
@@ -1077,8 +1076,8 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _toggle_show_mip(self):
         """Toggle whether the maximum-intensity projection is shown."""
-        if self._toggle_show_mip_button.text() == "Show Max Intensity Proj":
-            self._toggle_show_mip_button.setText("Hide Max Intensity Proj")
+        self._showing_max_intensity_proj = not self._showing_max_intensity_proj
+        if self._showing_max_intensity_proj:
             self._images["mip"] = list()
             self._images["mip_chs"] = list()
             ct_min, ct_max = np.nanmin(self._ct_data), np.nanmax(self._ct_data)
@@ -1124,15 +1123,14 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 img.remove()
             self._images.pop("mip")
             self._images.pop("mip_chs")
-            self._toggle_show_mip_button.setText("Show Max Intensity Proj")
             for group in set(self._groups.values()):  # remove lines
                 self._update_lines(group, only_2D=True)
         self._draw()
 
     def _toggle_show_max(self):
         """Toggle whether to color local maxima differently."""
-        if self._toggle_show_max_button.text() == "Show Maxima":
-            self._toggle_show_max_button.setText("Hide Maxima")
+        self._showing_local_maxima = not self._showing_local_maxima
+        if self._showing_local_maxima:
             # happens on initiation or if the radius is changed with it off
             if self._ct_maxima is None:  # otherwise don't recompute
                 self._update_ct_maxima()
@@ -1157,7 +1155,6 @@ class IntracranialElectrodeLocator(SliceBrowser):
             for img in self._images["local_max"]:
                 img.remove()
             self._images.pop("local_max")
-            self._toggle_show_max_button.setText("Show Maxima")
         self._draw()
 
     def _toggle_show_brain(self):
@@ -1166,19 +1163,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
             for img in self._images["mri"]:
                 img.remove()
             self._images.pop("mri")
-            self._toggle_brain_button.setText("Show Brain")
         else:
             self._images["mri"] = list()
             for axis in range(3):
-                mri_data = np.take(
-                    self._mr_data, self._current_slice[axis], axis=axis
-                ).T
+                cmap = None if self._using_atlas else "hot"
+                mri_data = self._get_mr_slice(axis)
                 self._images["mri"].append(
                     self._figs[axis]
                     .axes[0]
-                    .imshow(mri_data, cmap="hot", aspect="auto", alpha=0.25, zorder=2)
+                    .imshow(mri_data, cmap=cmap, aspect="auto", alpha=0.25, zorder=2)
                 )
-            self._toggle_brain_button.setText("Hide Brain")
         self._draw()
 
     def keyPressEvent(self, event):

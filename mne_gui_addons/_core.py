@@ -10,7 +10,7 @@ import os.path as op
 import numpy as np
 from functools import partial
 
-from qtpy import QtCore
+from qtpy import QtCore, QtGui
 from qtpy.QtCore import Slot, Signal, Qt
 from qtpy.QtWidgets import (
     QMainWindow,
@@ -30,6 +30,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
 
+from mne import read_freesurfer_lut
 from mne.viz.backends.renderer import _get_renderer
 from mne.viz.utils import safe_event
 from mne.surface import _read_mri_surface, _marching_cubes
@@ -185,6 +186,10 @@ class SliceBrowser(QMainWindow):
         super(SliceBrowser, self).__init__()
         self.setAttribute(Qt.WA_DeleteOnClose, True)
 
+        atlas_ids, colors = read_freesurfer_lut()
+        self._fs_lut = {atlas_id: colors[name] for name, atlas_id in atlas_ids.items()}
+        self._atlas_ids = {val: key for key, val in atlas_ids.items()}
+
         self._verbose = verbose
         # if bad/None subject, will raise an informative error when loading MRI
         subject = os.environ.get("SUBJECT") if subject is None else subject
@@ -231,25 +236,24 @@ class SliceBrowser(QMainWindow):
 
     def _load_image_data(self, base_image=None):
         """Get image data to display and transforms to/from vox/RAS."""
+        self._using_atlas = False
         if self._subject_dir is None:
             # if the recon-all is not finished or the CT is not
             # downsampled to the MRI, the MRI can not be used
-            self._mr_data = None
-            self._head = None
-            self._lh = self._rh = None
+            self._mr_data = self._head = self._lh = self._rh = None
+            self._mr_scan_ras_ras_vox_t = None
         else:
-            mri_img = (
-                "brain"
-                if op.isfile(op.join(self._subject_dir, "mri", "brain.mgz"))
-                else "T1"
-            )
+            mr_base_fname = op.join(self._subject_dir, "mri", "{}.mgz")
+            mr_fname = mr_base_fname.format('brain') if \
+                op.isfile(mr_base_fname.format('brain')) else mr_base_fname.format('T1')
             (
                 self._mr_data,
                 mr_vox_mri_t,
                 mr_vox_scan_ras_t,
                 mr_ras_vox_scan_ras_t,
                 self._mr_vol_info,
-            ) = _load_image(op.join(self._subject_dir, "mri", f"{mri_img}.mgz"))
+            ) = _load_image(mr_fname)
+            self._mr_scan_ras_ras_vox_t = np.linalg.inv(mr_ras_vox_scan_ras_t)
 
         # ready alternate base image if provided, otherwise use brain/T1
         self._base_mr_aligned = True
@@ -477,23 +481,39 @@ class SliceBrowser(QMainWindow):
         """Make a bar at the bottom with information in it."""
         hbox = QHBoxLayout() if hbox is None else hbox
 
-        self._show_hide_selector = ComboBox()
+        self._toggle_show_selector = ComboBox()
 
         # add title, not selectable
-        self._show_hide_selector.addItem("Show/Hide")
-        model = self._show_hide_selector.model()
+        self._toggle_show_selector.addItem("Show/Hide")
+        model = self._toggle_show_selector.model()
         model.itemFromIndex(model.index(0, 0)).setSelectable(False)
+        # color differently
+        color = QtGui.QColor("gray")
+        brush = QtGui.QBrush(color)
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        model.setData(model.index(0, 0), brush, QtCore.Qt.BackgroundRole)
+
+        if self._base_mr_aligned and hasattr(self, '_toggle_show_brain'):
+            self._toggle_show_selector.addItem("Show brain slices")
+            self._toggle_show_selector.addItem("Show atlas slices")
+
+        if hasattr(self, "_toggle_show_mip"):
+            self._toggle_show_selector.addItem("Show max intensity proj")
+
+        if hasattr(self, "_toggle_show_max"):
+            self._toggle_show_selector.addItem("Show local maxima")
 
         if self._head_actor is not None:
-            self._show_hide_selector.addItem("Hide head")
+            self._toggle_show_selector.addItem("Hide 3D head")
 
         if self._lh_actor is not None and self._rh_actor is not None:
-            self._show_hide_selector.addItem("Hide brain")
+            self._toggle_show_selector.addItem("Hide 3D brain")
 
         if self._mc_actor is not None:
-            self._show_hide_selector.addItem("Hide rendering")
-        self._show_hide_selector.currentIndexChanged.connect(self._show_hide)
-        hbox.addWidget(self._show_hide_selector)
+            self._toggle_show_selector.addItem("Hide 3D rendering")
+
+        self._toggle_show_selector.currentIndexChanged.connect(self._toggle_show)
+        hbox.addWidget(self._toggle_show_selector)
 
         self._intensity_label = QLabel("")  # update later
         hbox.addWidget(self._intensity_label)
@@ -570,24 +590,51 @@ class SliceBrowser(QMainWindow):
         if ras is not None:
             self._set_ras(ras)
 
-    def _show_hide(self):
+    def _toggle_show(self):
         """Show or hide objects in the 3D rendering."""
-        text = self._show_hide_selector.currentText()
+        text = self._toggle_show_selector.currentText()
         if text == "Show/Hide":
             return
-        idx = self._show_hide_selector.currentIndex()
-        show_hide, item = text.split(" ")
-        actors = dict(
-            head=[self._head_actor],
-            brain=[self._lh_actor, self._rh_actor],
-            rendering=[self._mc_actor],
-        )[item]
+        idx = self._toggle_show_selector.currentIndex()
+        show_hide, item = text.split(" ")[0], " ".join(text.split(" ")[1:])
         show_hide_opp = "Show" if show_hide == "Hide" else "Hide"
-        self._show_hide_selector.setItemText(idx, f"{show_hide_opp} {item}")
-        for actor in actors:
-            actor.SetVisibility(show_hide == "Show")
-        self._show_hide_selector.setCurrentIndex(0)  # back to title
-        self._renderer._update()
+        if 'slices' in item:
+            # atlas shown and brain already on or brain already on and atlas shown
+            if show_hide == "Show" and "mri" in self._images:
+                self._toggle_show_brain()
+                if self._using_atlas:
+                    self._toggle_show_selector.setItemText(1, f"Hide atlas slices")
+                else:
+                    self._toggle_show_selector.setItemText(0, f"Hide brain slices")
+            mr_base_fname = op.join(self._subject_dir, "mri", "{}.mgz")
+            if show_hide == "Show" and "atlas" in item and not self._using_atlas:
+                if op.isfile(mr_base_fname.format("wmparc")):
+                    self._mr_data = _load_image(mr_base_fname.format("wmparc"))[0]
+                else:
+                    self._mr_data = _load_image(mr_base_fname.format("aparc+aseg"))[0]
+                self._using_atlas = True
+            if show_hide == "Show" and "brain" in item and self._using_atlas:
+                if op.isfile(mr_base_fname.format("brain")):
+                    self._mr_data = _load_image(mr_base_fname.format("brain"))[0]
+                else:
+                    self._mr_data = _load_image(mr_base_fname.format("T1"))[0]
+                self._using_atlas = False
+            self._toggle_show_brain()
+        elif item == "max intensity proj":
+            self._toggle_show_mip()
+        elif item == "local maxima":
+            self._toggle_show_max()
+        else:
+            actors = {
+                "3D head": [self._head_actor],
+                "3D brain": [self._lh_actor, self._rh_actor],
+                "3D rendering": [self._mc_actor],
+            }[item]
+            for actor in actors:
+                actor.SetVisibility(show_hide == "Show")
+            self._renderer._update()
+        self._toggle_show_selector.setCurrentIndex(0)  # back to title
+        self._toggle_show_selector.setItemText(idx, f"{show_hide_opp} {item}")
 
     def _convert_text(self, text, text_kind):
         text = text.replace("\n", "")
@@ -769,9 +816,13 @@ class SliceBrowser(QMainWindow):
         self._VOX_textbox.setText(
             "{:3d}, {:3d}, {:3d}".format(*self._vox.round().astype(int))
         )
-        self._intensity_label.setText(
-            "intensity = {:.2f}".format(self._base_data[tuple(self._current_slice)])
-        )
+        intensity_text = "intensity = {:.2f}".format(
+            self._base_data[tuple(self._current_slice)])
+        if self._using_atlas:
+            vox = apply_trans(self._mr_scan_ras_ras_vox_t, self._ras).round().astype(int)
+            label = self._atlas_ids[int(self._mr_data[tuple(vox)])]
+            intensity_text += f' ({label})'
+        self._intensity_label.setText(intensity_text)
 
     @safe_event
     def closeEvent(self, event):
