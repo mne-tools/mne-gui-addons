@@ -57,8 +57,8 @@ def test_slice_browser_display(renderer_interactive_pyvistaqt):
         gui = SliceBrowser(subject=subject, subjects_dir=subjects_dir)
 
     # test show/hide
-    gui._show_hide_selector.setCurrentIndex(1)  # hide
-    gui._show_hide_selector.setCurrentIndex(1)  # show
+    gui._toggle_show_selector.setCurrentIndex(1)  # hide
+    gui._toggle_show_selector.setCurrentIndex(1)  # show
 
     # test RAS
     gui._RAS_textbox.setText("10 10 10")

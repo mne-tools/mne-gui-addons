@@ -623,6 +623,7 @@ class SliceBrowser(QMainWindow):
                     self._mr_data = _load_image(mr_base_fname.format("T1"))[0]
                 self._using_atlas = False
             self._toggle_show_brain()
+            self._update_moved()
         elif item == "max intensity proj":
             self._toggle_show_mip()
         elif item == "local maxima":
