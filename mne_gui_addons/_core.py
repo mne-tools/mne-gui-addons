@@ -244,8 +244,11 @@ class SliceBrowser(QMainWindow):
             self._mr_scan_ras_ras_vox_t = None
         else:
             mr_base_fname = op.join(self._subject_dir, "mri", "{}.mgz")
-            mr_fname = mr_base_fname.format('brain') if \
-                op.isfile(mr_base_fname.format('brain')) else mr_base_fname.format('T1')
+            mr_fname = (
+                mr_base_fname.format("brain")
+                if op.isfile(mr_base_fname.format("brain"))
+                else mr_base_fname.format("T1")
+            )
             (
                 self._mr_data,
                 mr_vox_mri_t,
@@ -493,7 +496,7 @@ class SliceBrowser(QMainWindow):
         brush.setStyle(QtCore.Qt.SolidPattern)
         model.setData(model.index(0, 0), brush, QtCore.Qt.BackgroundRole)
 
-        if self._base_mr_aligned and hasattr(self, '_toggle_show_brain'):
+        if self._base_mr_aligned and hasattr(self, "_toggle_show_brain"):
             self._toggle_show_selector.addItem("Show brain slices")
             self._toggle_show_selector.addItem("Show atlas slices")
 
@@ -598,14 +601,14 @@ class SliceBrowser(QMainWindow):
         idx = self._toggle_show_selector.currentIndex()
         show_hide, item = text.split(" ")[0], " ".join(text.split(" ")[1:])
         show_hide_opp = "Show" if show_hide == "Hide" else "Hide"
-        if 'slices' in item:
+        if "slices" in item:
             # atlas shown and brain already on or brain already on and atlas shown
             if show_hide == "Show" and "mri" in self._images:
                 self._toggle_show_brain()
                 if self._using_atlas:
-                    self._toggle_show_selector.setItemText(1, f"Hide atlas slices")
+                    self._toggle_show_selector.setItemText(1, "Hide atlas slices")
                 else:
-                    self._toggle_show_selector.setItemText(0, f"Hide brain slices")
+                    self._toggle_show_selector.setItemText(0, "Hide brain slices")
             mr_base_fname = op.join(self._subject_dir, "mri", "{}.mgz")
             if show_hide == "Show" and "atlas" in item and not self._using_atlas:
                 if op.isfile(mr_base_fname.format("wmparc")):
@@ -817,11 +820,14 @@ class SliceBrowser(QMainWindow):
             "{:3d}, {:3d}, {:3d}".format(*self._vox.round().astype(int))
         )
         intensity_text = "intensity = {:.2f}".format(
-            self._base_data[tuple(self._current_slice)])
+            self._base_data[tuple(self._current_slice)]
+        )
         if self._using_atlas:
-            vox = apply_trans(self._mr_scan_ras_ras_vox_t, self._ras).round().astype(int)
+            vox = (
+                apply_trans(self._mr_scan_ras_ras_vox_t, self._ras).round().astype(int)
+            )
             label = self._atlas_ids[int(self._mr_data[tuple(vox)])]
-            intensity_text += f' ({label})'
+            intensity_text += f" ({label})"
         self._intensity_label.setText(intensity_text)
 
     @safe_event

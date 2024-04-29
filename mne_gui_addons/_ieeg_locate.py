@@ -987,9 +987,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _get_mr_slice(self, axis):
         """Get the current MR slice."""
-        mri_data = np.take(
-            self._mr_data, self._current_slice[axis], axis=axis
-        ).T
+        mri_data = np.take(self._mr_data, self._current_slice[axis], axis=axis).T
         if self._using_atlas:
             mri_slice = mri_data.copy().astype(int)
             mri_data = np.zeros(mri_slice.shape + (3,), dtype=int)
