@@ -306,7 +306,6 @@ class VolSourceEstimateViewer(SliceBrowser):
         ]
         src_coord = self._get_src_coord()
         for axis in range(3):
-            stc_slice = self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T
             x_idx, y_idx = self._xy_idx[axis]
             extent = [
                 corners[0][x_idx],
@@ -318,7 +317,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 self._figs[axis]
                 .axes[0]
                 .imshow(
-                    stc_slice,
+                    self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T,
                     aspect="auto",
                     extent=extent,
                     cmap=self._cmap,
@@ -1381,10 +1380,13 @@ class VolSourceEstimateViewer(SliceBrowser):
         for axis in range(3):
             # ensure in bounds
             if src_coord[axis] >= 0 and src_coord[axis] < self._stc_img.shape[axis]:
-                stc_slice = self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T
+                self._images["stc"][axis].set_data(
+                    self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T
+                )
             else:
-                stc_slice = self._stc_img[(slice(None),) * axis + (0,)].T * np.nan
-            self._images["stc"][axis].set_data(stc_slice)
+                self._images["stc"][axis].set_data(
+                    self._stc_img[(slice(None),) * axis + (0,)].copy().T * np.nan
+                )
             if draw and self._update:
                 self._draw(axis)
 

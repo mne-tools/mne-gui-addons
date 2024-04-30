@@ -337,12 +337,11 @@ class VolumeSegmenter(SliceBrowser):
         for axis in range(3):
             fig = self._figs[axis]
             ax = fig.axes[0]
-            vol_data = self._vol_img[
-                (slice(None),) * axis + (self._current_slice[axis],)
-            ].T
             self._images["vol"].append(
                 ax.imshow(
-                    vol_data,
+                    self._vol_img[
+                        (slice(None),) * axis + (self._current_slice[axis],)
+                    ].T,
                     aspect="auto",
                     zorder=3,
                     cmap=_CMAP,
@@ -442,10 +441,9 @@ class VolumeSegmenter(SliceBrowser):
     def _update_vol_images(self, axis=None, draw=False):
         """Update the volume image(s)."""
         for axis in range(3) if axis is None else [axis]:
-            vol_data = self._vol_img[
-                (slice(None),) * axis + (self._current_slice[axis],)
-            ].T
-            self._images["vol"][axis].set_data(vol_data)
+            self._images["vol"][axis].set_data(
+                self._vol_img[(slice(None),) * axis + (self._current_slice[axis],)].T
+            )
             if draw:
                 self._draw(axis)
 
