@@ -652,8 +652,8 @@ class SliceBrowser(QMainWindow):
             for actor in actors:
                 actor.SetVisibility(show_hide == "Show")
             self._renderer._update()
-        self._toggle_show_selector.setCurrentIndex(0)  # back to title
         self._toggle_show_selector.setItemText(idx, f"{show_hide_opp} {item}")
+        self._toggle_show_selector.setCurrentIndex(0)  # back to title
 
     def _convert_text(self, text, text_kind):
         text = text.replace("\n", "")
