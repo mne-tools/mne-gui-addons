@@ -998,7 +998,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         for axis in range(3) if axis is None else [axis]:
             ct_data = self._ct_data[
                 (slice(None),) * axis + (self._current_slice[axis],)
-            ].T
+            ].copy().T
             # Threshold the CT so only bright objects (electrodes) are visible
             ct_data[ct_data < self._ct_min_slider.value()] = np.nan
             ct_data[ct_data > self._ct_max_slider.value()] = np.nan
