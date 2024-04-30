@@ -619,11 +619,9 @@ class SliceBrowser(QMainWindow):
         if "slices" in item:
             # atlas shown and brain already on or brain already on and atlas shown
             if show_hide == "Show" and "mri" in self._images:
+                idx2, item2 = (2, "atlas") if self._using_atlas else (1, "brain")
+                self._toggle_show_selector.setItemText(idx2, f"Show {item2} slices")
                 self._toggle_show_brain()
-                if self._using_atlas:
-                    self._toggle_show_selector.setItemText(1, "Hide atlas slices")
-                else:
-                    self._toggle_show_selector.setItemText(0, "Hide brain slices")
             mr_base_fname = op.join(self._subject_dir, "mri", "{}.mgz")
             if show_hide == "Show" and "atlas" in item and not self._using_atlas:
                 if op.isfile(mr_base_fname.format("wmparc")):
