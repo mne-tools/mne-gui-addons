@@ -357,10 +357,11 @@ class SliceBrowser(QMainWindow):
             plot_x_idx, plot_y_idx = self._xy_idx[axis]
             fig = self._figs[axis]
             ax = fig.axes[0]
-            img_data = np.take(self._base_data, self._current_slice[axis], axis=axis).T
             self._images["base"].append(
                 ax.imshow(
-                    img_data,
+                    self._base_data[
+                        (slice(None),) * axis + (self._current_slice[axis],)
+                    ].T,
                     cmap="gray",
                     aspect="auto",
                     zorder=1,
@@ -623,8 +624,9 @@ class SliceBrowser(QMainWindow):
     def _update_base_images(self, axis=None, draw=False):
         """Update the base images."""
         for axis in range(3) if axis is None else [axis]:
-            img_data = np.take(self._base_data, self._current_slice[axis], axis=axis).T
-            self._images["base"][axis].set_data(img_data)
+            self._images["base"][axis].set_data(
+                self._base_data[(slice(None),) * axis + (self._current_slice[axis],)].T
+            )
             if draw:
                 self._draw(axis)
 

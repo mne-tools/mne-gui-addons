@@ -37,9 +37,10 @@ def test_segment_display(renderer_interactive_pyvistaqt):
 
     # test no seghead, fsaverage doesn't have seghead
     with pytest.warns(RuntimeWarning, match="`seghead` not found"):
-        gui = VolumeSegmenter(
-            subject="fsaverage", subjects_dir=subjects_dir, verbose=True
-        )
+        with pytest.warns(RuntimeWarning, match="`pial` surface not found"):
+            gui = VolumeSegmenter(
+                subject="fsaverage", subjects_dir=subjects_dir, verbose=True
+            )
 
     # test functions
     gui.set_RAS([25.37, 0.00, 34.18])
