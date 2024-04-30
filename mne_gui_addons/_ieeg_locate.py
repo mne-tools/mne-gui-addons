@@ -973,22 +973,29 @@ class IntracranialElectrodeLocator(SliceBrowser):
     def _update_ct_images(self, axis=None, draw=False):
         """Update the CT image(s)."""
         for axis in range(3) if axis is None else [axis]:
-            ct_data = np.take(self._ct_data, self._current_slice[axis], axis=axis).T
+            ct_data = (
+                self._ct_data[(slice(None),) * axis + (self._current_slice[axis],)]
+                .copy()
+                .T
+            )
             # Threshold the CT so only bright objects (electrodes) are visible
             ct_data[ct_data < self._ct_min_slider.value()] = np.nan
             ct_data[ct_data > self._ct_max_slider.value()] = np.nan
             self._images["ct"][axis].set_data(ct_data)
             if "local_max" in self._images:
-                ct_max_data = np.take(
-                    self._ct_maxima, self._current_slice[axis], axis=axis
-                ).T
-                self._images["local_max"][axis].set_data(ct_max_data)
+                self._images["local_max"][axis].set_data(
+                    self._ct_maxima[
+                        (slice(None),) * axis + (self._current_slice[axis],)
+                    ].T
+                )
             if draw:
                 self._draw(axis)
 
     def _get_mr_slice(self, axis):
         """Get the current MR slice."""
-        mri_data = np.take(self._mr_data, self._current_slice[axis], axis=axis).T
+        mri_data = self._mr_data[
+            (slice(None),) * axis + (self._current_slice[axis],)
+        ].T
         if self._using_atlas:
             mri_slice = mri_data.copy().astype(int)
             mri_data = np.zeros(mri_slice.shape + (3,), dtype=int)
@@ -1135,14 +1142,13 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._update_ct_maxima()
             self._images["local_max"] = list()
             for axis in range(3):
-                ct_max_data = np.take(
-                    self._ct_maxima, self._current_slice[axis], axis=axis
-                ).T
                 self._images["local_max"].append(
                     self._figs[axis]
                     .axes[0]
                     .imshow(
-                        ct_max_data,
+                        self._ct_maxima[
+                            (slice(None),) * axis + (self._current_slice[axis],)
+                        ].T,
                         cmap="autumn",
                         aspect="auto",
                         vmin=0,
@@ -1166,11 +1172,16 @@ class IntracranialElectrodeLocator(SliceBrowser):
             self._images["mri"] = list()
             for axis in range(3):
                 cmap = None if self._using_atlas else "hot"
-                mri_data = self._get_mr_slice(axis)
                 self._images["mri"].append(
                     self._figs[axis]
                     .axes[0]
-                    .imshow(mri_data, cmap=cmap, aspect="auto", alpha=0.25, zorder=2)
+                    .imshow(
+                        self._get_mr_slice(axis),
+                        cmap="hot",
+                        aspect="auto",
+                        alpha=0.25,
+                        zorder=2,
+                    )
                 )
         self._draw()
 
