@@ -306,7 +306,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         ]
         src_coord = self._get_src_coord()
         for axis in range(3):
-            stc_slice = np.take(self._stc_img, src_coord[axis], axis=axis).T
+            stc_slice = self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T
             x_idx, y_idx = self._xy_idx[axis]
             extent = [
                 corners[0][x_idx],
@@ -507,7 +507,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             # if self._data.dtype in (COMPLEX_DTYPE, BASE_INT_DTYPE):
             #    stc_data = stc_data.round().astype(BASE_INT_DTYPE)
         else:
-            stc_data = np.take(stc_data, 0, axis=axis)
+            stc_data = stc_data[(slice(None),) * axis + (0,)]
         return stc_data
 
     def _apply_baseline_correction(self, stc_data):
@@ -541,9 +541,9 @@ class VolSourceEstimateViewer(SliceBrowser):
 
     def _pick_stc_tfr(self, stc_data):
         """Select the frequency and time based on GUI values."""
-        stc_data = np.take(stc_data, self._t_idx, axis=-1)
+        stc_data = stc_data[..., self._t_idx]
         f_idx = 0 if self._f_idx is None else self._f_idx
-        stc_data = np.take(stc_data, f_idx, axis=-1)
+        stc_data = stc_data[..., f_idx]
         return stc_data
 
     def _configure_ui(self):
@@ -1381,9 +1381,9 @@ class VolSourceEstimateViewer(SliceBrowser):
         for axis in range(3):
             # ensure in bounds
             if src_coord[axis] >= 0 and src_coord[axis] < self._stc_img.shape[axis]:
-                stc_slice = np.take(self._stc_img, src_coord[axis], axis=axis).T
+                stc_slice = self._stc_img[(slice(None),) * axis + (src_coord[axis],)].T
             else:
-                stc_slice = np.take(self._stc_img, 0, axis=axis).T * np.nan
+                stc_slice = self._stc_img[(slice(None),) * axis + (0,)].T * np.nan
             self._images["stc"][axis].set_data(stc_slice)
             if draw and self._update:
                 self._draw(axis)

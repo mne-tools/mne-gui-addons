@@ -1000,9 +1000,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
             ct_data[ct_data > self._ct_max_slider.value()] = np.nan
             self._images["ct"][axis].set_data(ct_data)
             if "local_max" in self._images:
-                ct_max_data = np.take(
-                    self._ct_maxima, self._current_slice[axis], axis=axis
-                ).T
+                ct_max_data = self._ct_maxima[
+                    (slice(None),) * axis + (self._current_slice[axis],)
+                ].T
                 self._images["local_max"][axis].set_data(ct_max_data)
             if draw:
                 self._draw(axis)
@@ -1150,9 +1150,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
                 self._update_ct_maxima()
             self._images["local_max"] = list()
             for axis in range(3):
-                ct_max_data = np.take(
-                    self._ct_maxima, self._current_slice[axis], axis=axis
-                ).T
+                ct_max_data = self._ct_maxima[
+                    (slice(None),) * axis + (self._current_slice[axis],)
+                ].T
                 self._images["local_max"].append(
                     self._figs[axis]
                     .axes[0]
@@ -1182,9 +1182,9 @@ class IntracranialElectrodeLocator(SliceBrowser):
         else:
             self._images["mri"] = list()
             for axis in range(3):
-                mri_data = np.take(
-                    self._mr_data, self._current_slice[axis], axis=axis
-                ).T
+                mri_data = self._mr_data[
+                    (slice(None),) * axis + (self._current_slice[axis],)
+                ].T
                 self._images["mri"].append(
                     self._figs[axis]
                     .axes[0]

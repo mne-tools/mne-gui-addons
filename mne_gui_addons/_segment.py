@@ -320,7 +320,9 @@ class VolumeSegmenter(SliceBrowser):
     def _update_base_images(self, axis=None, draw=False):
         """Update the CT image(s)."""
         for axis in range(3) if axis is None else [axis]:
-            img_data = np.take(self._base_data, self._current_slice[axis], axis=axis).T
+            img_data = self._base_data[
+                (slice(None),) * axis + (self._current_slice[axis],)
+            ].T.copy()
             img_data[img_data < self._img_min_slider.value()] = np.nan
             img_data[img_data > self._img_max_slider.value()] = np.nan
             self._images["base"][axis].set_data(img_data)
@@ -335,7 +337,9 @@ class VolumeSegmenter(SliceBrowser):
         for axis in range(3):
             fig = self._figs[axis]
             ax = fig.axes[0]
-            vol_data = np.take(self._vol_img, self._current_slice[axis], axis=axis).T
+            vol_data = self._vol_img[
+                (slice(None),) * axis + (self._current_slice[axis],)
+            ].T
             self._images["vol"].append(
                 ax.imshow(
                     vol_data,
@@ -438,7 +442,9 @@ class VolumeSegmenter(SliceBrowser):
     def _update_vol_images(self, axis=None, draw=False):
         """Update the volume image(s)."""
         for axis in range(3) if axis is None else [axis]:
-            vol_data = np.take(self._vol_img, self._current_slice[axis], axis=axis).T
+            vol_data = self._vol_img[
+                (slice(None),) * axis + (self._current_slice[axis],)
+            ].T
             self._images["vol"][axis].set_data(vol_data)
             if draw:
                 self._draw(axis)
