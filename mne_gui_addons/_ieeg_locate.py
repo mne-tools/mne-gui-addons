@@ -993,9 +993,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def _get_mr_slice(self, axis):
         """Get the current MR slice."""
-        mri_data = self._mr_data[
-            (slice(None),) * axis + (self._current_slice[axis],)
-        ].T
+        mri_data = self._mr_data[(slice(None),) * axis + (self._current_slice[axis],)].T
         if self._using_atlas:
             mri_slice = mri_data.copy().astype(int)
             mri_data = np.zeros(mri_slice.shape + (3,), dtype=int)
@@ -1171,13 +1169,12 @@ class IntracranialElectrodeLocator(SliceBrowser):
         else:
             self._images["mri"] = list()
             for axis in range(3):
-                cmap = None if self._using_atlas else "hot"
                 self._images["mri"].append(
                     self._figs[axis]
                     .axes[0]
                     .imshow(
                         self._get_mr_slice(axis),
-                        cmap="hot",
+                        cmap=None if self._using_atlas else "hot",
                         aspect="auto",
                         alpha=0.25,
                         zorder=2,
