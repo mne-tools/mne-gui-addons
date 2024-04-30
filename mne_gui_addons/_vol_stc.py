@@ -584,7 +584,7 @@ class VolSourceEstimateViewer(SliceBrowser):
 
         # add help and show/hide
         super(VolSourceEstimateViewer, self)._configure_toolbar(hbox=hbox)
-        
+
         hbox.addStretch(1)
 
         if self._data.shape[0] > 1:

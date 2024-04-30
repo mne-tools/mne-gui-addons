@@ -303,7 +303,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
         # add help and show/hide
         super(IntracranialElectrodeLocator, self)._configure_toolbar(hbox=hbox)
-        
+
         hbox.addStretch(1)
 
         hbox.addWidget(QLabel("Snap to Center"))
