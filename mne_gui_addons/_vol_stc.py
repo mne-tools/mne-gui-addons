@@ -581,11 +581,10 @@ class VolSourceEstimateViewer(SliceBrowser):
         """Make a bar with buttons for user interactions."""
         hbox = QHBoxLayout()
 
-        help_button = QPushButton("Help")
-        help_button.released.connect(self._show_help)
-        hbox.addWidget(help_button)
+        # add help and show/hide
+        super(VolSourceEstimateViewer, self)._configure_toolbar(hbox=hbox)
 
-        hbox.addStretch(8)
+        hbox.addStretch(1)
 
         if self._data.shape[0] > 1:
             self._epoch_selector = QComboBox()
