@@ -57,7 +57,7 @@ def _fake_stc(src_type="vol"):
     ) + 1j * rng.integers(
         -1000, 1000, size=(n_epochs, len(info.ch_names), freqs.size, times.size)
     )
-    epochs_tfr = mne.time_frequency.EpochsTFR(info, data, times=times, freqs=freqs)
+    epochs_tfr = mne.time_frequency.EpochsTFRArray(info, data, times=times, freqs=freqs)
     nuse = sum([this_src["nuse"] for this_src in src])
     stc_data = rng.integers(
         -1000, 1000, size=(n_epochs, nuse, 3, freqs.size, times.size)
