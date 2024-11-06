@@ -4,10 +4,11 @@
 #
 # License: BSD-3-Clause
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
-from mne.utils import verbose as _verbose, _check_option
+from mne.utils import _check_option
+from mne.utils import verbose as _verbose
 
 from ._utils import _fill_doc
 
@@ -70,6 +71,7 @@ def locate_ieeg(
         The graphical user interface (GUI) window.
     """
     from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+
     from ._ieeg_locate import IntracranialElectrodeLocator
 
     app = _init_mne_qtapp()
@@ -165,11 +167,12 @@ def view_vol_stc(
         The graphical user interface (GUI) window.
     """
     from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+
     from ._vol_stc import (
-        VolSourceEstimateViewer,
         BASE_INT_DTYPE,
         COMPLEX_DTYPE,
         RANGE_VALUE,
+        VolSourceEstimateViewer,
     )
 
     _check_option("group", group, (True, False, "itc", "power"))
@@ -312,6 +315,7 @@ def segment_volume(
         The graphical user interface (GUI) window.
     """
     from mne.viz.backends._utils import _init_mne_qtapp, _qt_app_exec
+
     from ._segment import VolumeSegmenter
 
     app = _init_mne_qtapp()
@@ -328,18 +332,19 @@ def segment_volume(
     return gui
 
 
-class _GUIScraper(object):
+class _GUIScraper:
     """Scrape GUI outputs."""
 
     def __repr__(self):
         return "<GUIScraper>"
 
     def __call__(self, block, block_vars, gallery_conf):
-        from ._ieeg_locate import IntracranialElectrodeLocator
-        from ._vol_stc import VolSourceEstimateViewer
-        from ._segment import VolumeSegmenter
-        from sphinx_gallery.scrapers import figure_rst
         from qtpy import QtGui
+        from sphinx_gallery.scrapers import figure_rst
+
+        from ._ieeg_locate import IntracranialElectrodeLocator
+        from ._segment import VolumeSegmenter
+        from ._vol_stc import VolSourceEstimateViewer
 
         for gui in block_vars["example_globals"].values():
             if (

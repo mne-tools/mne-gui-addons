@@ -73,8 +73,26 @@ markers = [
     "allow_unclosed: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
 ]
 
-[tool.ruff]
-exclude = ["dist/" , "build/"]
+[tool.ruff.lint]
+ignore = [
+  "D100",  # Missing docstring in public module
+  "D104",  # Missing docstring in public package
+  "D413",  # Missing blank line after last section
+]
+select = ["A", "B006", "D", "E", "F", "I", "UP", "UP031", "W"]
 
-[tool.black]
-exclude = "(dist/)|(build/)"
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+ignore-decorators = [
+  "mne.utils.copy_doc",
+  "mne.utils.copy_function_doc_to_method_doc",
+  "mne.utils.deprecated",
+  "property",
+  "setter",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*.py" = [
+  "D205",  # 1 blank line required between summary line and description
+  "D400",  # First line should end with a period
+]

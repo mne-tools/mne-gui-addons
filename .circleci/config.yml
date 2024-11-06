@@ -43,6 +43,7 @@ jobs:
             name: Get Python running
             command: |
               pip install --upgrade PyQt6!=6.6.0 "PyQt6-Qt6!=6.6.0,!=6.7.0" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject pyvista memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
+              pip install --pre --progress-bar off --only-binary dipy --extra-index-url "https://pypi.anaconda.org/scientific-python-nightly-wheels/simple" "dipy>1.9"
               pip install -ve ./mne-python .
         - run:
             name: Check Qt

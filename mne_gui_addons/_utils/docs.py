@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """The documentation functions."""
 # Authors: Eric Larson <larson.eric.d@gmail.com>
 #
 # License: BSD (3-clause)
 
-from mne.utils.docs import _indentcount_lines, docdict as _mne_docdict
+from mne.utils.docs import _indentcount_lines
+from mne.utils.docs import docdict as _mne_docdict
 
 ##############################################################################
 # Define our standard documentation entries
@@ -12,9 +12,7 @@ from mne.utils.docs import _indentcount_lines, docdict as _mne_docdict
 docdict = _mne_docdict.copy()
 # Specific to this repo
 
-docdict[
-    "tmax"
-] = """
+docdict["tmax"] = """
 tmax : scalar
     Time point of the last sample in data.
 """
@@ -65,6 +63,6 @@ def _fill_doc(f):
         funcname = f.__name__
         funcname = docstring.split("\n")[0] if funcname is None else funcname
         raise RuntimeError(
-            "%s documenting %s:\n%s" % (exp.__class__.__name__, funcname, str(exp))
+            f"{exp.__class__.__name__} documenting {funcname}:\n{str(exp)}"
         )
     return f

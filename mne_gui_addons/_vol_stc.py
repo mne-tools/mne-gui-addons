@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Source estimate viewing graphical user interfaces (GUIs)."""
 
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
@@ -6,41 +5,41 @@
 # License: BSD (3-clause)
 
 import os.path as op
+
 import numpy as np
-
-from qtpy import QtCore
-from qtpy.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QMessageBox,
-    QWidget,
-    QSlider,
-    QPushButton,
-    QComboBox,
-    QLineEdit,
-    QFrame,
-)
 from matplotlib.colors import LinearSegmentedColormap
-
-from ._core import SliceBrowser
 from mne import BaseEpochs
-from mne.baseline import rescale, _check_baseline
+from mne.baseline import _check_baseline, rescale
 from mne.defaults import DEFAULTS
 from mne.evoked import EvokedArray
-from mne.time_frequency import EpochsTFR
 from mne.io.constants import FIFF
 from mne.io.pick import _picks_to_idx
+from mne.time_frequency import EpochsTFR
 from mne.transforms import apply_trans
 from mne.utils import (
+    _check_option,
+    _check_range,
     _require_version,
     _validate_type,
-    _check_range,
     fill_doc,
-    _check_option,
 )
 from mne.viz.backends._utils import _qt_safe_window
 from mne.viz.utils import _get_cmap
+from qtpy import QtCore
+from qtpy.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ._core import SliceBrowser
 
 BASE_INT_DTYPE = np.int16
 COMPLEX_DTYPE = np.dtype([("re", BASE_INT_DTYPE), ("im", BASE_INT_DTYPE)])
@@ -280,9 +279,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         stc_data_vol = self._pick_stc_tfr(self._stc_data_vol)
         self._stc_img = _make_vol(self._src_lut, stc_data_vol)
 
-        super(VolSourceEstimateViewer, self).__init__(
-            subject=subject, subjects_dir=subjects_dir
-        )
+        super().__init__(subject=subject, subjects_dir=subjects_dir)
 
         # convert to RAS now that super call has loaded transforms
         self._src_rr = apply_trans(self._mri_scan_ras_t, self._src_rr)
@@ -582,7 +579,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         hbox = QHBoxLayout()
 
         # add help and show/hide
-        super(VolSourceEstimateViewer, self)._configure_toolbar(hbox=hbox)
+        super()._configure_toolbar(hbox=hbox)
 
         hbox.addStretch(1)
 
@@ -635,7 +632,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                     value = np.clip(value, 0, SLIDER_WIDTH)
                     self.setValue(int(round(value)))
                 else:
-                    super(Slider, self).mouseReleaseEvent(event)
+                    super().mouseReleaseEvent(event)
 
         def make_slider(smin, smax, sval, sfun=None):
             slider = Slider(QtCore.Qt.Horizontal)
@@ -770,7 +767,7 @@ class VolSourceEstimateViewer(SliceBrowser):
         hbox.addWidget(self._intensity_label)
 
         # add SliceBrowser navigation items
-        hbox = super(VolSourceEstimateViewer, self)._configure_status_bar(hbox=hbox)
+        hbox = super()._configure_status_bar(hbox=hbox)
         return hbox
 
     def _configure_data_plot(self):
@@ -838,7 +835,7 @@ class VolSourceEstimateViewer(SliceBrowser):
                 inst_data = inst.data[None]  # new axis for single epoch
             # convert to power or ITC for group
             if self._group == "ITC" and np.iscomplexobj(inst_data):
-                inst_data = np.abs((inst_data / np.abs(inst_data)))
+                inst_data = np.abs(inst_data / np.abs(inst_data))
             elif self._group and np.iscomplexobj(inst_data):  # power
                 inst_data = (inst_data * inst_data.conj()).real
             return inst_data
@@ -881,10 +878,10 @@ class VolSourceEstimateViewer(SliceBrowser):
         ave_max = evo_data.max()
         self._ave_min = min([evo_data.min(), -ave_max])
         self._ave_range = max([ave_max, -self._ave_min]) - self._ave_min
-        vmin, vmax = [
+        vmin, vmax = (
             val / SLIDER_WIDTH * self._ave_range + self._ave_min
             for val in (self._cmap_sliders[i].value() for i in (0, 2))
-        ]
+        )
         cbar_fmt = "%3.1f" if abs(evo_data).max() < 1e3 else "%.1e"
         ave.plot_topomap(
             times=self._inst.times[self._t_idx],
@@ -1192,10 +1189,10 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._cmap_sliders[1].setValue(self._cmap_sliders[0].value())
         self._update = update_tmp
 
-        vmin, vmid, vmax = [
+        vmin, vmid, vmax = (
             val / SLIDER_WIDTH * self._stc_range + self._stc_min
             for val in (self._cmap_sliders[i].value() for i in range(3))
-        ]
+        )
         mid_pt = (vmid - vmin) / (vmax - vmin)
         ctable = self._cmap(
             np.concatenate([np.linspace(0, mid_pt, 128), np.linspace(mid_pt, 1, 128)])
@@ -1231,10 +1228,10 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._update_data_plot_ylabel()
 
         if self._show_topomap:
-            topo_vmin, topo_vmax = [
+            topo_vmin, topo_vmax = (
                 val / SLIDER_WIDTH * self._ave_range + self._ave_min
                 for val in (self._cmap_sliders[i].value() for i in (0, 2))
-            ]
+            )
             self._topo_fig.axes[0].get_images()[0].set_clim(topo_vmin, topo_vmax)
             if draw and self._update:
                 self._topo_fig.canvas.draw()

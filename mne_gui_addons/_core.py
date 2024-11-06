@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Shared GUI classes and functions."""
 
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
@@ -7,44 +6,42 @@
 
 import os
 import os.path as op
-import numpy as np
 from functools import partial
 
-from qtpy import QtCore, QtGui
-from qtpy.QtCore import Slot, Signal, Qt
-from qtpy.QtWidgets import (
-    QMainWindow,
-    QGridLayout,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QMessageBox,
-    QWidget,
-    QLineEdit,
-    QComboBox,
-    QPushButton,
-)
-
+import numpy as np
 from matplotlib import patheffects
 from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
-from matplotlib.colors import LinearSegmentedColormap
-
 from mne import read_freesurfer_lut
-from mne.viz.backends.renderer import _get_renderer
-from mne.viz.utils import safe_event
-from mne.surface import _read_mri_surface, _marching_cubes
-from mne.transforms import apply_trans, _frame_to_str
+from mne.surface import _marching_cubes, _read_mri_surface
+from mne.transforms import _frame_to_str, apply_trans
 from mne.utils import (
-    logger,
     _check_fname,
+    _import_nibabel,
+    get_subjects_dir,
+    logger,
     verbose,
     warn,
-    get_subjects_dir,
-    _import_nibabel,
 )
 from mne.viz.backends._utils import _qt_safe_window
+from mne.viz.backends.renderer import _get_renderer
+from mne.viz.utils import safe_event
+from qtpy import QtCore, QtGui
+from qtpy.QtCore import Qt, Signal, Slot
+from qtpy.QtWidgets import (
+    QComboBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 _IMG_LABELS = [["I", "P"], ["I", "L"], ["P", "L"]]
 _ZOOM_STEP_SIZE = 5
@@ -162,7 +159,7 @@ class ComboBox(QComboBox):
     def showPopup(self):
         """Override show popup method to emit click."""
         self.clicked.emit()
-        super(ComboBox, self).showPopup()
+        super().showPopup()
 
 
 class SliceBrowser(QMainWindow):
@@ -184,7 +181,7 @@ class SliceBrowser(QMainWindow):
     ):
         """GUI for browsing slices of anatomical images."""
         # initialize QMainWindow class
-        super(SliceBrowser, self).__init__()
+        super().__init__()
         self.setAttribute(Qt.WA_DeleteOnClose, True)
 
         atlas_ids, colors = read_freesurfer_lut()
@@ -570,7 +567,7 @@ class SliceBrowser(QMainWindow):
         for axis, fig in enumerate(self._figs):
             xcur = self._images["cursor_v"][axis].get_xdata()[0]
             ycur = self._images["cursor_h"][axis].get_ydata()[0]
-            rx, ry = [self._voxel_ratios[idx] for idx in self._xy_idx[axis]]
+            rx, ry = (self._voxel_ratios[idx] for idx in self._xy_idx[axis])
             xmin, xmax = fig.axes[0].get_xlim()
             ymin, ymax = fig.axes[0].get_ylim()
 
@@ -834,8 +831,8 @@ class SliceBrowser(QMainWindow):
         self._VOX_textbox.setText(
             "{:3d}, {:3d}, {:3d}".format(*self._vox.round().astype(int))
         )
-        intensity_text = "intensity = {:.2f}".format(
-            self._base_data[tuple(self._current_slice)]
+        intensity_text = (
+            f"intensity = {self._base_data[tuple(self._current_slice)]:.2f}"
         )
         if self._using_atlas:
             vox = (

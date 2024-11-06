@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tissue Segmentation GUI for finding making 3D volumes."""
 
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
@@ -6,23 +5,23 @@
 # License: BSD (3-clause)
 
 import os.path as op
+
 import numpy as np
 from mne.surface import _marching_cubes, write_surface
 from mne.transforms import apply_trans
-
-from ._core import SliceBrowser, _CMAP, _N_COLORS, make_label, _load_image
-
 from qtpy import QtCore
 from qtpy.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QWidget,
-    QSlider,
-    QPushButton,
     QFileDialog,
+    QHBoxLayout,
     QMessageBox,
+    QPushButton,
+    QSlider,
     QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
+
+from ._core import _CMAP, _N_COLORS, SliceBrowser, _load_image, make_label
 
 
 def _get_neighbors(loc, image, voxels, val, tol):
@@ -39,7 +38,7 @@ def _get_neighbors(loc, image, voxels, val, tol):
 
 
 def _voxel_neighbors(seed, image, tol, max_n_voxels=200):
-    """Find voxels contiguous with a seed location within a tolerance
+    """Find voxels contiguous with a seed location within a tolerance.
 
     Parameters
     ----------
@@ -99,7 +98,7 @@ class VolumeSegmenter(SliceBrowser):
         self._alpha = 0.8
         self._vol_actor = None
 
-        super(VolumeSegmenter, self).__init__(
+        super().__init__(
             base_image=base_image,
             subject=subject,
             subjects_dir=subjects_dir,
@@ -234,7 +233,7 @@ class VolumeSegmenter(SliceBrowser):
         return hbox
 
     def _apply_brainmask(self):
-        """Mask the volume using the brainmask"""
+        """Mask the volume using the brainmask."""
         if self._subject_dir is None or not op.isfile(
             op.join(self._subject_dir, "mri", "brainmask.mgz")
         ):

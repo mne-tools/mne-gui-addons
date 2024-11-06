@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pyvista
+
 import mne_gui_addons
 
 faulthandler.enable()

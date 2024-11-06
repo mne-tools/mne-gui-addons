@@ -1,5 +1,6 @@
-import mne_gui_addons
 from packaging.version import Version
+
+import mne_gui_addons
 
 
 def test_import():
