@@ -1,18 +1,16 @@
-# -*- coding: utf-8 -*-
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
 #
 # License: BSD-3-clause
 
-import numpy as np
-from numpy.testing import assert_allclose
-
-import pytest
-
 import mne
+import numpy as np
+import pytest
 from mne.datasets import testing
 from mne.transforms import apply_trans
 from mne.utils import use_log_level
 from mne.viz.utils import _fake_click
+from numpy.testing import assert_allclose
+
 import mne_gui_addons as mne_gui
 
 data_path = testing.data_path(download=False)

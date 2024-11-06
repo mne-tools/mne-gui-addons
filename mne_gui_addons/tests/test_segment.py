@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
 #
 # License: BSD-3-clause
 
 import numpy as np
-
 import pytest
-
 from mne.datasets import testing
 
 data_path = testing.data_path(download=False)

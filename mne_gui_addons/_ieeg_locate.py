@@ -1,35 +1,33 @@
-# -*- coding: utf-8 -*-
 """Intracranial elecrode localization GUI for finding contact locations."""
 
 # Authors: Alex Rockhill <aprockhill@mailbox.org>
 #
 # License: BSD (3-clause)
 
-import numpy as np
 import platform
 
-from scipy.ndimage import maximum_filter
-
+import numpy as np
+from mne import pick_types
+from mne.channels import make_dig_montage
+from mne.surface import _voxel_neighbors
+from mne.transforms import _get_trans, apply_trans, invert_transform
+from mne.utils import _validate_type, logger, verbose, warn
 from qtpy import QtCore, QtGui
 from qtpy.QtCore import Slot
 from qtpy.QtWidgets import (
-    QVBoxLayout,
+    QAbstractItemView,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
-    QWidget,
-    QAbstractItemView,
     QListView,
-    QSlider,
+    QMessageBox,
     QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
 )
+from scipy.ndimage import maximum_filter
 
-from ._core import SliceBrowser, ComboBox, _CMAP, _N_COLORS
-from mne.channels import make_dig_montage
-from mne.surface import _voxel_neighbors
-from mne.transforms import apply_trans, _get_trans, invert_transform
-from mne.utils import logger, _validate_type, verbose, warn
-from mne import pick_types
+from ._core import _CMAP, _N_COLORS, ComboBox, SliceBrowser
 
 _CH_PLOT_SIZE = 1024
 _DEFAULT_RADIUS = 2
@@ -102,7 +100,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         self._group_channels(groups)
 
         # Initialize GUI
-        super(IntracranialElectrodeLocator, self).__init__(
+        super().__init__(
             base_image=base_image, subject=subject, subjects_dir=subjects_dir
         )
 
@@ -302,7 +300,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
         hbox = QHBoxLayout()
 
         # add help and show/hide
-        super(IntracranialElectrodeLocator, self)._configure_toolbar(hbox=hbox)
+        super()._configure_toolbar(hbox=hbox)
 
         hbox.addStretch(1)
 
@@ -412,11 +410,11 @@ class IntracranialElectrodeLocator(SliceBrowser):
         hbox.addWidget(self._intensity_label)
 
         # add SliceBrowser navigation items
-        super(IntracranialElectrodeLocator, self)._configure_status_bar(hbox=hbox)
+        super()._configure_status_bar(hbox=hbox)
         return hbox
 
     def _move_cursors_to_pos(self):
-        super(IntracranialElectrodeLocator, self)._move_cursors_to_pos()
+        super()._move_cursors_to_pos()
 
         self._ch_list.setFocus()  # remove focus from text edit
 
@@ -463,9 +461,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
             loc = np.array(list(neighbors)).mean(axis=0)
             if not local_maxima2 or np.min(
                 np.linalg.norm(np.array(local_maxima2) - loc, axis=1)
-            ) > np.sqrt(
-                3
-            ):  # must be more than (1, 1, 1) voxel away
+            ) > np.sqrt(3):  # must be more than (1, 1, 1) voxel away
                 local_maxima2.append(loc)
         return np.array(local_maxima2)
 
@@ -1184,7 +1180,7 @@ class IntracranialElectrodeLocator(SliceBrowser):
 
     def keyPressEvent(self, event):
         """Execute functions when the user presses a key."""
-        super(IntracranialElectrodeLocator, self).keyPressEvent(event)
+        super().keyPressEvent(event)
 
         if event.text() == "m":
             self.mark_channel()
