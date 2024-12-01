@@ -81,7 +81,7 @@ jobs:
     - name: Run pytest
       run: pytest mne_gui_addons --cov-report=xml
     - name: Upload coverage stats to codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ebcd818a-7a71-470d-b667-7cd9c3003c7d
       if: success() || failure()
