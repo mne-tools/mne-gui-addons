@@ -3,8 +3,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     groups:
       actions:
         patterns:
           - "*"
+    commit-message:
+      prefix: "[dependabot]"
+    cooldown:
+      default-days: 7
