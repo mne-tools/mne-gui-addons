@@ -6,6 +6,7 @@
 
 import os
 import os.path as op
+import warnings
 from functools import partial
 
 import numpy as np
@@ -99,7 +100,13 @@ def _load_image(img, verbose=None):
         _check_fname(img, overwrite="read", must_exist=True)
         img = nib.load(img)
     # get data
-    orig_data = np.array(img.dataobj).astype(np.float32)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=DeprecationWarning,
+            message=".*doesn't accept a copy keyword.*",
+        )
+        orig_data = np.array(img.dataobj).astype(np.float32)
     # reorient data to RAS
     ornt = nib.orientations.axcodes2ornt(
         nib.orientations.aff2axcodes(img.affine)

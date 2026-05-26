@@ -4,6 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      time: "15:00"
     groups:
       actions:
         patterns:
