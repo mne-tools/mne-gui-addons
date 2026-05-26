@@ -9,6 +9,8 @@ import os.path as op
 import numpy as np
 from mne.surface import _marching_cubes, write_surface
 from mne.transforms import apply_trans
+from mne.utils import _auto_weakref
+
 from qtpy import QtCore
 from qtpy.QtWidgets import (
     QFileDialog,
@@ -139,6 +141,7 @@ class VolumeSegmenter(SliceBrowser):
             slider.setTracking(False)  # only update on release
             if sfun is not None:
                 slider.valueChanged.connect(sfun)
+            # TODO: QSlider has no keyPressEvent...?
             slider.keyPressEvent = self.keyPressEvent
             return slider
 
@@ -156,9 +159,12 @@ class VolumeSegmenter(SliceBrowser):
         # no callback needed, will only be used when marked
         self._tol_slider = make_slider(0, 100, 10, None)
         slider_vbox.addWidget(self._tol_slider)
-        self._smooth_slider = make_slider(
-            0, 100, 0, lambda x: self._plot_3d(render=True)
-        )
+
+        @_auto_weakref
+        def _plot():
+            return self._plot_3d(render=True)
+
+        self._smooth_slider = make_slider(0, 100, 0, _plot)
         slider_vbox.addWidget(self._smooth_slider)
 
         slider_hbox.addLayout(slider_vbox)
