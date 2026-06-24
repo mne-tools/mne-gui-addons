@@ -21,6 +21,7 @@ from mne.utils import (
     _check_range,
     _require_version,
     _validate_type,
+    check_version,
     fill_doc,
 )
 from mne.viz.backends._utils import _qt_safe_window
@@ -1364,7 +1365,12 @@ class VolSourceEstimateViewer(SliceBrowser):
     def _plot_3d_stc(self, draw=True):
         """Update the 3D rendering."""
         self._plot_vectors(draw=False)
-        self._grid.cell_data["values"] = np.where(
+        # old MNE used cell data
+        if check_version("mne", "1.13"):
+            use_data = self._grid.point_data
+        else:
+            use_data = self._grid.cell_data
+        use_data["values"] = np.where(
             np.isnan(self._stc_img), 0.0, self._stc_img
         ).flatten(order="F")
         if draw and self._update:
