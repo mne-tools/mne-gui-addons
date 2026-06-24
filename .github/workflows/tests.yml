@@ -40,9 +40,9 @@ jobs:
             mne-version: mne-main
             qt: PySide6
     steps:
-    - uses: actions/checkout@v6.0.3
+    - uses: actions/checkout@v7.0.0
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v6.2.0
       with:
         python-version: ${{ matrix.python-version }}
     - uses: pyvista/setup-headless-display-action@main
@@ -70,7 +70,7 @@ jobs:
       working-directory: mne-python
       shell: bash
       name: 'Get testing version'
-    - uses: actions/cache@v5
+    - uses: actions/cache@v5.0.5
       with:
         key: ${{ env.TESTING_VERSION }}
         path: ~/mne_data
