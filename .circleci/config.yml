@@ -124,6 +124,7 @@ jobs:
               chmod og= ~/.ssh/config
               git config --global user.email "circle@mne.tools"
               git config --global user.name "Circle CI"
+              ssh-add -D && ssh-add ~/.ssh/id_rsa_1740cc78a4d493785be6e61d12334c0d
               if [ ! -d ~/mne-tools.github.io ]; then
                 git clone git@github.com:/mne-tools/mne-tools.github.io.git ~/mne-tools.github.io
               fi
