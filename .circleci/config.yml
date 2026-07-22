@@ -49,7 +49,7 @@ jobs:
         - run:
             name: Check Qt
             command: |
-              ./mne-tools/tools/check_qt_import.sh PyQt6
+               bash /mne-tools/tools/check_qt_import.sh PyQt6
         - run:
             name: Check installation
             command: |
