@@ -61,7 +61,9 @@ jobs:
     - run: pip install -ve .[tests]
     - run: mne sys_info
     # Check Qt
-    - run: ./tools/check_qt_import.sh $MNE_QT_BACKEND
+    - run: |
+        wget -q https://raw.githubusercontent.com/mne-tools/mne-tools/main/tools/check_qt_import.sh
+        bash check_qt_import.sh $MNE_QT_BACKEND
       if: ${{ env.MNE_QT_BACKEND != '' }}
       name: Check Qt
       shell: bash

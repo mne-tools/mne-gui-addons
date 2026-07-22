@@ -24,7 +24,8 @@ jobs:
               set -e
               set -o pipefail
               git clone --single-branch --branch main git@github.com:/mne-tools/mne-python.git
-              ./mne-python/tools/setup_xvfb.sh
+              git clone --single-branch --branch main git@github.com:/mne-tools/mne-tools.git
+              ./mne-tools/tools/setup_xvfb.sh
               sudo apt install -qq graphviz optipng python3.10-venv python3-venv libxft2 ffmpeg
               python3.10 -m venv ~/python_env
               echo "set -e" >> $BASH_ENV
@@ -48,7 +49,7 @@ jobs:
         - run:
             name: Check Qt
             command: |
-              ./mne-python/tools/check_qt_import.sh PyQt6
+              ./mne-tools/tools/check_qt_import.sh PyQt6
         - run:
             name: Check installation
             command: |
