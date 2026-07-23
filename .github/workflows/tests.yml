@@ -60,14 +60,9 @@ jobs:
     - run: pip install -v "${{ matrix.qt }}!=6.6.0,!=6.10.0" "PyQt6-Qt6!=6.6.0,!=6.7.0,!=6.10.0,!=6.10.1,!=6.10.2"
     - run: pip install -ve .[tests]
     - run: mne sys_info
-    - name: Get Python env root
-      shell: bash
-      run: |
-        echo "PYTHON_ENV_ROOT=$(python -c 'import pathlib, sys; print(pathlib.Path(sys.executable).resolve().parent.parent)')" >> "$GITHUB_ENV"
     - name: Check Qt import
       uses: tsbinns/mne-tools/actions/check-qt-import@tools-actions
       with:
-        python-env-root: ${{ env.PYTHON_ENV_ROOT }}
         qt-backend: ${{ matrix.qt }}
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
     - run: ./tools/get_testing_version.sh
