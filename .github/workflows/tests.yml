@@ -60,11 +60,10 @@ jobs:
     - run: pip install -v "${{ matrix.qt }}!=6.6.0,!=6.10.0" "PyQt6-Qt6!=6.6.0,!=6.7.0,!=6.10.0,!=6.10.1,!=6.10.2"
     - run: pip install -ve .[tests]
     - run: mne sys_info
-    # Check Qt
-    - run: ./tools/check_qt_import.sh $MNE_QT_BACKEND
-      if: ${{ env.MNE_QT_BACKEND != '' }}
-      name: Check Qt
-      shell: bash
+    - name: Check Qt import
+      uses: tsbinns/mne-tools/actions/check-qt-import@tools-actions
+      with:
+        qt-backend: ${{ matrix.qt }}
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
     - run: ./tools/get_testing_version.sh
       working-directory: mne-python
