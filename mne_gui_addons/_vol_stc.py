@@ -386,6 +386,8 @@ class VolSourceEstimateViewer(SliceBrowser):
                 bgcolor="white",
                 label_font_size=10,
             )
+            if isinstance(self._scalar_bar, tuple):  # MNE 1.13+ also returns tick actor
+                self._scalar_bar = self._scalar_bar[0]
             self._scalar_bar.SetOrientationToVertical()
             self._scalar_bar.SetHeight(0.6)
             self._scalar_bar.SetWidth(0.05)
