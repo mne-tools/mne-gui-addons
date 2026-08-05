@@ -61,7 +61,7 @@ jobs:
     - run: pip install -ve .[tests]
     - run: mne sys_info
     - name: Check Qt import
-      uses: tsbinns/mne-tools/actions/check-qt-import@tools-actions
+      uses: mne-tools/mne-tools/actions/check-qt-import@tools-actions
       with:
         qt-backend: ${{ matrix.qt }}
     - run: python -c "import mne_gui_addons; print(mne_gui_addons.__version__)"
