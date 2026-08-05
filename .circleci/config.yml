@@ -49,14 +49,14 @@ jobs:
         - run:
             name: Check Qt
             command: |
-               ./mne-tools/tools/check_qt_import.sh PyQt6
+              ./mne-tools/tools/check_qt_import.sh PyQt6
         - run:
             name: Check installation
             command: |
-               which python
-               QT_DEBUG_PLUGINS=1 mne sys_info -pd
-               python -c "import numpy; numpy.show_config()"
-               LIBGL_DEBUG=verbose python -c "import pyvistaqt; pyvistaqt.BackgroundPlotter(show=True)"
+              which python
+              QT_DEBUG_PLUGINS=1 mne sys_info -pd
+              python -c "import numpy; numpy.show_config()"
+              LIBGL_DEBUG=verbose python -c "import pyvistaqt; pyvistaqt.BackgroundPlotter(show=True)"
         - run:
             name: List packages
             command: python -m pip list
