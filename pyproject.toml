@@ -16,8 +16,6 @@ classifiers = [
 dependencies = [
     "packaging",
     "qtpy",
-    "PyQt6!=6.6.0",
-    "PyQt6-Qt6!=6.6.0,!=6.7.0",
     "pyvista",
     "pyvistaqt",
     "mne",
@@ -28,8 +26,8 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-[project.optional-dependencies]
-tests = [
+[dependency-groups]
+test = [
     "pytest",
     "pytest-cov",
     "pytest-qt",
@@ -37,6 +35,20 @@ tests = [
     "sphinx-gallery",
     "imageio-ffmpeg>=0.4.1",
     "refleak >= 0.2.1",
+]
+doc = [
+    "sphinx-gallery",
+    "pydata-sphinx-theme",
+    "numpydoc",
+    "scikit-learn",
+    "nilearn",
+    "mne-bids",
+    "autoreject",
+    "memory_profiler",
+    "sphinxcontrib.bibtex",
+    "sphinxcontrib.youtube",
+    "darkdetect",
+    "qdarkstyle",
 ]
 
 [project.urls]

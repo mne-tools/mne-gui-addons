@@ -5,8 +5,8 @@ jobs:
         scheduled:
           type: string
           default: "false"
-      docker:
-        - image: cimg/base:current-22.04
+      machine:
+        image: ubuntu-2604:2026.05.1
       steps:
         - checkout
         - run:
@@ -24,10 +24,11 @@ jobs:
               set -e
               set -o pipefail
               git clone --single-branch --branch main git@github.com:/mne-tools/mne-python.git
+              pushd mne-python; git fetch origin --tags; popd
               git clone --single-branch --branch main git@github.com:/mne-tools/mne-tools.git
               ./mne-tools/tools/setup_xvfb.sh
-              sudo apt install -qq graphviz optipng python3.10-venv python3-venv libxft2 ffmpeg
-              python3.10 -m venv ~/python_env
+              sudo apt install -qq graphviz optipng python3-venv libxft2 ffmpeg
+              python -m venv ~/python_env
               echo "set -e" >> $BASH_ENV
               echo "export OPENBLAS_NUM_THREADS=4" >> $BASH_ENV
               echo "export XDG_RUNTIME_DIR=/tmp/runtime-circleci" >> $BASH_ENV
@@ -43,13 +44,12 @@ jobs:
         - run:
             name: Get Python running
             command: |
-              pip install --upgrade PyQt6!=6.6.0 "PyQt6-Qt6!=6.6.0,!=6.7.0" sphinx-gallery pydata-sphinx-theme numpydoc scikit-learn nilearn mne-bids autoreject pyvista memory_profiler sphinxcontrib.bibtex sphinxcontrib.youtube darkdetect qdarkstyle
-              pip install --pre --progress-bar off --only-binary dipy --extra-index-url "https://pypi.anaconda.org/scientific-python-nightly-wheels/simple" "dipy>1.9"
-              pip install -ve ./mne-python .
+              pip install --upgrade pip
+              pip install --upgrade -e ./mne-python -e . --group doc PySide6
         - run:
             name: Check Qt
             command: |
-              ./mne-tools/tools/check_qt_import.sh PyQt6
+              ./mne-tools/tools/check_qt_import.sh PySide6
         - run:
             name: Check installation
             command: |

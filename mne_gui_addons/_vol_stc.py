@@ -372,9 +372,16 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._volume_pos_actor = self._renderer.plotter.add_actor(
                 self._volume_pos, render=False
             )[0]
-            self._volume_neg_actor = self._renderer.plotter.add_actor(
-                self._volume_neg, render=False
-            )[0]
+            # MNE 1.13+ renders a divergent MIP as a single volume with the
+            # colors baked into the data and returns no negative volume; older
+            # versions pair a MIP with a MinIP, which VTK composites in the
+            # order the actors were added rather than by depth
+            if self._volume_neg is None:
+                self._volume_neg_actor = None
+            else:
+                self._volume_neg_actor = self._renderer.plotter.add_actor(
+                    self._volume_neg, render=False
+                )[0]
             _, grid_prop = self._renderer.plotter.add_actor(
                 self._grid_mesh, render=False
             )
@@ -1258,12 +1265,16 @@ class VolSourceEstimateViewer(SliceBrowser):
 
         # set alpha
         ctable[ctable[:, 3] > self._alpha * 255, 3] = self._alpha * 255
+        # remember these so _plot_3d_stc() can re-bake the baked-color volume
+        self._volume_ctable = ctable
+        self._volume_rng = [vmin, vmax]
         self._renderer._set_volume_range(
             self._volume_pos, ctable, self._alpha, self._scalar_bar, [vmin, vmax]
         )
-        self._renderer._set_volume_range(
-            self._volume_neg, ctable, self._alpha, self._scalar_bar, [vmin, vmax]
-        )
+        if self._volume_neg is not None:
+            self._renderer._set_volume_range(
+                self._volume_neg, ctable, self._alpha, self._scalar_bar, [vmin, vmax]
+            )
         if draw and self._update:
             self._renderer._update()
 
@@ -1375,6 +1386,16 @@ class VolSourceEstimateViewer(SliceBrowser):
         use_data["values"] = np.where(
             np.isnan(self._stc_img), 0.0, self._stc_img
         ).flatten(order="F")
+        # MNE 1.13+ renders a divergent MIP from colors baked into the grid, so
+        # they have to be rebuilt whenever the values change. _update_cmap()
+        # does it for us via _set_volume_range(), but that is not always what
+        # runs next -- _update_stc_images() can be called on its own. Test for
+        # the method rather than the version: this landed partway through the
+        # 1.13 development cycle, so check_version() cannot tell the dev builds
+        # that have it from the ones that do not.
+        rebake = getattr(self._renderer, "_update_volume_rgba", None)
+        if rebake is not None and getattr(self, "_volume_ctable", None) is not None:
+            rebake(self._grid, self._volume_ctable, self._volume_rng)
         if draw and self._update:
             self._renderer._update()
 
