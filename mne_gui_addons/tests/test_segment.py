@@ -11,21 +11,19 @@ subject = "sample"
 subjects_dir = data_path / "subjects"
 
 
-@pytest.mark.allow_unclosed
 @testing.requires_testing_data
 def test_segment_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the volume segmenter GUI."""
     from mne_gui_addons._segment import VolumeSegmenter
 
     with pytest.warns(match="`pial` surface not found"):
-        VolumeSegmenter(
+        gui = VolumeSegmenter(
             subject=subject,
             subjects_dir=subjects_dir,
         )
+    gui.close()
 
 
-# TODO: For some reason this leaves some stuff un-closed, we should fix it
-@pytest.mark.allow_unclosed
 @testing.requires_testing_data
 def test_segment_display(renderer_interactive_pyvistaqt):
     """Test that the volume segmenter GUI displays properly."""
