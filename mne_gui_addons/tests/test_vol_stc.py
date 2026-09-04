@@ -63,7 +63,6 @@ def _fake_stc(src_type="vol"):
     return stc_data, src, epochs_tfr
 
 
-@pytest.mark.allow_unclosed_pyside2
 def test_stc_viewer_io(renderer_interactive_pyvistaqt):
     """Test the input/output of the stc viewer GUI."""
     pytest.importorskip("nibabel")
@@ -124,7 +123,6 @@ def test_stc_viewer_io(renderer_interactive_pyvistaqt):
         VolSourceEstimateViewer(stc_data[:, :, :, :, 1:], src=src, inst=epochs_tfr)
 
 
-@pytest.mark.allow_unclosed_pyside2
 @testing.requires_testing_data
 def test_stc_viewer_display(renderer_interactive_pyvistaqt):
     """Test that the stc viewer GUI displays properly."""

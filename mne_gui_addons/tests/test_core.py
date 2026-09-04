@@ -24,15 +24,14 @@ def test_slice_browser_io(renderer_interactive_pyvistaqt):
     data[30:50, 30:50, 30:50] = 2
 
     with pytest.warns(match="`pial` surface not found"):
-        SliceBrowser(
+        gui = SliceBrowser(
             nib.MGHImage(data, np.eye(4)),
             subject=subject,
             subjects_dir=subjects_dir,
         )
+    gui.close()
 
 
-# TODO: For some reason this leaves some stuff un-closed, we should fix it
-@pytest.mark.allow_unclosed
 @testing.requires_testing_data
 def test_slice_browser_display(renderer_interactive_pyvistaqt):
     """Test that the slice browser GUI displays properly."""

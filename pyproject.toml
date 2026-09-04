@@ -34,7 +34,7 @@ test = [
     "black",  # function signature formatting
     "sphinx-gallery",
     "imageio-ffmpeg>=0.4.1",
-    "refleak >= 0.2.1",
+    "refleak >= 0.2.2",
 ]
 doc = [
     "sphinx-gallery",
@@ -82,10 +82,6 @@ testpaths = [
     "mne_gui_addons",
 ]
 junit_family = "xunit2"
-markers = [
-    "allow_unclosed_pyside2: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
-    "allow_unclosed: temporary fix for marker only on dev, remove on mne-python 1.6 release", "serial",
-]
 
 [tool.ruff.lint]
 ignore = [

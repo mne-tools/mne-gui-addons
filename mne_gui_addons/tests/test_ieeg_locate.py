@@ -84,7 +84,6 @@ def test_ieeg_elec_locate_io(renderer_interactive_pyvistaqt):
         mne_gui.locate_ieeg(info, trans, aligned_ct, subject, subjects_dir)
 
 
-@pytest.mark.allow_unclosed_pyside2
 @testing.requires_testing_data
 def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_path):
     """Test sphinx-gallery scraping of the GUI."""
@@ -117,10 +116,9 @@ def test_locate_scraper(renderer_interactive_pyvistaqt, _fake_CT_coords, tmp_pat
     mne_gui._GUIScraper()(None, block_vars, gallery_conf)
     assert image_path.is_file()
     assert gui._scraped
-    # no need to call .close
+    gui.close()
 
 
-@pytest.mark.allow_unclosed_pyside2
 @testing.requires_testing_data
 def test_ieeg_elec_locate_display(renderer_interactive_pyvistaqt, _fake_CT_coords):
     """Test that the intracranial location GUI displays properly."""
