@@ -29,7 +29,9 @@ jobs:
               pushd mne-python; git fetch origin --tags; popd
               git clone --single-branch --branch main git@github.com:/mne-tools/mne-tools.git
               ./mne-tools/tools/setup_xvfb.sh
-              sudo apt install -qq graphviz optipng python3-venv libxft2 ffmpeg
+              # no -qq: it hides download progress, which trips CircleCI's 10 min no-output timeout
+              sudo apt install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+                graphviz optipng python3-venv libxft2 ffmpeg
               python -m venv ~/python_env
               echo "set -e" >> $BASH_ENV
               echo "export OPENBLAS_NUM_THREADS=4" >> $BASH_ENV
