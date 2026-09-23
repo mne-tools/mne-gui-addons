@@ -73,11 +73,31 @@ jobs:
         - restore_cache:
             keys:
               - data-cache-somato
+        - restore_cache:
+            keys:
+              - data-cache-eegbci
         - run:
             name: Get data
             command: |
               python -c "import mne; mne.datasets.somato.data_path(update_path=True, verbose=True); mne.datasets.misc.data_path(update_path=True, verbose=True); sample_path = mne.datasets.sample.data_path(update_path=True, verbose=True); mne.datasets.fetch_fsaverage(subjects_dir=sample_path / 'subjects', verbose=True)"
+              python -c "import mne; mne.datasets.eegbci.load_data(subjects=[1, 2, 3], runs=[6, 10, 14], update_path=True)"
               ls -al ~/mne_data;
+        - save_cache:
+            key: data-cache-sample
+            paths:
+              - ~/mne_data/MNE-sample-data
+        - save_cache:
+            key: data-cache-somato
+            paths:
+              - ~/mne_data/MNE-somato-data
+        - save_cache:
+            key: data-cache-misc
+            paths:
+              - ~/mne_data/MNE-misc-data
+        - save_cache:
+            key: data-cache-eegbci
+            paths:
+              - ~/mne_data/MNE-eegbci-data
         - run:
             name: make html
             command: |
@@ -95,18 +115,6 @@ jobs:
             root: doc/_build
             paths:
               - html
-        - save_cache:
-            key: data-cache-sample
-            paths:
-              - ~/mne_data/MNE-sample-data
-        - save_cache:
-            key: data-cache-somato
-            paths:
-              - ~/mne_data/MNE-somato-data
-        - save_cache:
-            key: data-cache-misc
-            paths:
-              - ~/mne_data/MNE-misc-data
 
     deploy:
       docker:
