@@ -121,7 +121,7 @@ for sub in range(1, 4):
     lambda2 = 1.0 / snr**2
     method = "MNE"  # use MNE method (could also be dSPM or sLORETA)
 
-    epochs.decimate(20)
+    epochs.resample(8.0)  # low-pass and downsample for speed
     insts_epochs.append(epochs)
 
     # do time-series epochs first

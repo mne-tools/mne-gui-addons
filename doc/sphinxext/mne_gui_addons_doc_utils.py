@@ -18,6 +18,8 @@ def reset_warnings(gallery_conf, fname):
     warnings.filterwarnings("error")
     # internal warnings
     warnings.filterwarnings("default", module="sphinx")
+    # allow these, but show them
+    warnings.filterwarnings("always", ".*automatic search failed.*")
     # sphinx-gallery memory profiling (memory_profiler + multiprocessing)
     warnings.filterwarnings(
         "always",
