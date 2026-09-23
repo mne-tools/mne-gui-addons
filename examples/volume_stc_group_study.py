@@ -42,13 +42,7 @@ runs = [6, 10, 14]  # motor imagery: hands vs feet
 # Compute source time course (stc) estimates for both time courses
 # and spectrograms (time-frequency).
 
-# "standard_1005" was renamed "colin27_1005" in MNE 1.13
-kind = (
-    "colin27_1005"
-    if "colin27_1005" in mne.channels.get_builtin_montages()
-    else "standard_1005"
-)
-montage = mne.channels.make_standard_montage(kind)
+montage = mne.channels.make_standard_montage("colin27_1005")
 stcs_tfr = list()
 stcs_epochs = list()
 insts_tfr = list()
