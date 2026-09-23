@@ -113,6 +113,11 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "min_reported_time": 1.0,
     "abort_on_example_error": False,
+    "reset_modules": (
+        "matplotlib",
+        "mne_gui_addons_doc_utils.reset_warnings",
+    ),  # called w/each script
+    "reset_modules_order": "both",
     "image_scrapers": ("matplotlib", "mne_gui_addons_doc_utils.gui_scraper", "pyvista"),
     "show_memory": not sys.platform.startswith(("win", "darwin")),
     "line_numbers": False,  # messes with style

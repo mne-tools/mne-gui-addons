@@ -85,9 +85,10 @@ jobs:
     - run: ./tools/github_actions_download.sh
       working-directory: mne-python
     - name: Run pytest
-      run: pytest mne_gui_addons --cov-report=xml
+      # macOS runners have fewer cores and less RAM
+      run: pytest mne_gui_addons -n ${{ startsWith(matrix.os, 'macos') && 2 || 4 }} --dist loadscope --cov-report=xml
     - name: Upload coverage stats to codecov
-      uses: codecov/codecov-action@v7.0.0
+      uses: codecov/codecov-action@v7.1.1
       with:
         token: ebcd818a-7a71-470d-b667-7cd9c3003c7d
       if: success() || failure()
