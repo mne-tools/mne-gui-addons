@@ -18,3 +18,17 @@ def reset_warnings(gallery_conf, fname):
     warnings.filterwarnings("error")
     # internal warnings
     warnings.filterwarnings("default", module="sphinx")
+    # sphinx-gallery memory profiling (memory_profiler + multiprocessing)
+    warnings.filterwarnings(
+        "always",
+        "resource_tracker: process died unexpectedly.*",
+        category=UserWarning,
+    )
+    # ignore (DeprecationWarning)
+    for key in (
+        # nibabel
+        "__array__ implementation doesn't accept.*",
+    ):
+        warnings.filterwarnings(
+            "ignore", message=f".*{key}.*", category=DeprecationWarning
+        )
