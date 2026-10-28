@@ -1231,10 +1231,7 @@ class VolSourceEstimateViewer(SliceBrowser):
             self._fig.axes[0].set_ylim([self._stc_min, self._stc_min + self._stc_range])
         else:
             self._stc_plot.set_clim(vmin, vmax)
-            self._stc_plot.set_cmap(cmap)
-            # update colorbar
-            self._cax.clear()
-            self._cbar = self._fig.colorbar(self._stc_plot, cax=self._cax)
+            self._stc_plot.set_cmap(cmap)  # self._cbar updates via mappable callback
             self._update_data_plot_ylabel()
 
         if self._show_topomap:
